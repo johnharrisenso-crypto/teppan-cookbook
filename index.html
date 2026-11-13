@@ -12,7 +12,7 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Zen+Maru+Gothic:wght@500;700&family=IBM+Plex+Sans:wght@400;500;600&family=Zen+Kaku+Gothic+New:wght@400;500&display=swap" rel="stylesheet">
 <style>
-/* Teppan Cookbook version 0.7.1 (CS-066, 2026-11-12: a list read in flight no longer hides a just-added item; Loading text; favicon). 0.7 (2026-11-11): standalone app on Netlify; data through the Apps Script endpoint (no Claude or Google sign-in); new List tab, the shared grocery list. Built from Teppan Notebook version 3 by build.py. */
+/* Teppan Cookbook version 0.7.2 (CS-066, 2026-11-13: sections guessed for everyday items, no section picker). 0.7.1 (2026-11-12: a list read in flight no longer hides a just-added item; Loading text; favicon). 0.7 (2026-11-11): standalone app on Netlify; data through the Apps Script endpoint (no Claude or Google sign-in); new List tab, the shared grocery list. Built from Teppan Notebook version 3 by build.py. */
 /* Notebook version 3 (CS-066, 2026-11-05): Shop sends unchecked items to the shared Grocery list sheet; Cook # suggests max cook number + 1 (ISS-071). */
 /* Version 2 (CS-063, 2026-11-01): amounts shown under each step, scaled; totals in the ingredient's own unit. */
 /* Layout: one column, phone first; a bottom tab bar like a counter's order slips (Recipes, Shop, Log, Learn). */
@@ -370,12 +370,40 @@ function updateListStatus(){
 }
 
 // Best guess at a section for a typed item: same name on the list before, a usual, or a Pantry item.
+/* Built-in section guess for everyday groceries (CS-066, 0.7.2). Order: something the list already knows
+   (on the list, a usual, a Pantry item), then whole phrases, then "frozen", then the words from last to first
+   ("chicken thighs" finds "chicken"). Unknown items go to Other. Plurals match their singular. */
+const GUESS = {
+  "Produce": "apple banana orange lemon lime grape berry strawberry blueberry raspberry blackberry cherry peach pear plum mango pineapple melon watermelon cantaloupe kiwi avocado tomato potato sweet-potato yam onion shallot garlic ginger carrot celery cucumber zucchini squash pumpkin pepper bell-pepper jalapeno chili lettuce romaine spinach kale arugula chard cabbage broccoli cauliflower brussels brussel sprout asparagus bean-sprout green-bean pea corn mushroom shiitake eggplant radish daikon beet turnip leek scallion green-onion herb cilantro parsley basil mint dill rosemary thyme sage shiso salad greens green fruit vegetable veggie nagaimo",
+  "Meat & seafood": "chicken beef pork lamb turkey duck steak ground-beef ground-turkey bacon sausage ham thigh breast wing drumstick rib ribeye brisket tenderloin loin belly chop fish salmon tuna cod halibut tilapia shrimp prawn scallop crab lobster clam mussel oyster squid octopus seafood meat",
+  "Dairy & eggs": "milk oat-milk almond-milk soy-milk cream half-and-half butter cheese cheddar mozzarella parmesan feta brie yogurt yoghurt egg sour-cream cottage-cheese cream-cheese kefir ghee",
+  "Deli & fridge": "tofu tempura-tofu hummus salsa guacamole deli turkey-slices salami prosciutto pastrami cold-cut kimchi pickle beni-shoga tortilla fresh-pasta dumpling gyoza miso dip",
+  "Dry goods": "rice pasta spaghetti noodle ramen udon soba flour sugar brown-sugar oat oatmeal cereal granola bean lentil chickpea quinoa couscous bread-crumb panko cracker chip pretzel popcorn nut almond peanut cashew walnut pecan seed raisin dried-fruit can canned soup broth stock peanut-butter jam jelly honey maple-syrup coffee tea cocoa baking-powder baking-soda yeast cornstarch chocolate cookie snack bar dashi tenkasu bonito nori seaweed",
+  "Sauces & seasonings": "salt pepper-ground black-pepper spice cumin paprika cinnamon oregano chili-powder curry turmeric seasoning sauce soy-sauce ketchup mustard mayo mayonnaise kewpie vinegar oil olive-oil vegetable-oil sesame-oil hot-sauce sriracha bbq-sauce worcestershire dressing marinade sesame shichimi furikake mirin sake-cooking fish-sauce oyster-sauce",
+  "Frozen": "ice-cream gelato frozen ice popsicle pizza-frozen",
+  "Bakery": "bread loaf baguette bagel bun roll croissant muffin sourdough pita naan english-muffin cake pie donut doughnut pastry",
+  "Drinks": "water sparkling-water seltzer soda juice beer wine sake kombucha coke sprite lacrosse la-croix energy-drink",
+  "Household": "paper-towel toilet-paper tissue napkin trash-bag garbage-bag foil plastic-wrap ziploc bag sponge dish-soap detergent laundry bleach cleaner soap shampoo conditioner toothpaste toothbrush deodorant razor battery light-bulb lightbulb candle cat-litter litter pet-food dog-food cat-food"
+};
+const GUESS_MAP = (() => { const m = new Map(); for (const [sec, words] of Object.entries(GUESS)) for (const w of words.split(" ")) if (w && !m.has(w.replace(/-/g, " "))) m.set(w.replace(/-/g, " "), sec); return m; })();
+function singular(w){ return w.replace(/(ies)$/, "y").replace(/(oes|ches|shes|sses|xes)$/, m => m.slice(0, -2)).replace(/([^s])s$/, "$1"); }
+function guessByWords(name){
+  const raw = norm(name).replace(/[^a-z\s-]/g, " ").replace(/-/g, " ").split(/\s+/).filter(Boolean);
+  if (!raw.length) return "";
+  const one = raw.map(singular), bare = raw.map(w => w.replace(/s$/, "")), look = k => GUESS_MAP.get(k);   // "cookies": the plain -s strip finds "cookie"
+  for (let len = Math.min(3, raw.length); len >= 2; len--)               // phrases first: "peanut butter", "ice cream", "paper towels"
+    for (let i = 0; i + len <= raw.length; i++) { const hit = look(raw.slice(i, i + len).join(" ")) || look(one.slice(i, i + len).join(" ")) || look(bare.slice(i, i + len).join(" ")); if (hit) return hit; }
+  if (raw.includes("frozen")) return "Frozen";
+  for (let i = raw.length - 1; i >= 0; i--) { const hit = look(raw[i]) || look(one[i]) || look(bare[i]); if (hit) return hit; }
+  return "";
+}
 function guessSection(name){
   const n = norm(name); if(!n) return "";
   const hit = (L ? [...L.list, ...L.usual] : []).find(x => norm(x.Item) === n && x.Section);
   if(hit) return hit.Section;
   const p = D && D.pantry.find(x => norm(x.item) === n);
-  return p ? sectionFor(p.section) : "";
+  if(p) return sectionFor(p.section);
+  return guessByWords(name);
 }
 
 function viewList(){
@@ -411,9 +439,8 @@ function viewList(){
     <form class="card" id="addform" novalidate>
       <label class="f" for="add-item" style="margin-top:0">Add to the list</label>
       <div style="display:grid;grid-template-columns:1fr auto;gap:8px"><input id="add-item" type="text" autocomplete="off" enterkeyhint="done" placeholder="Milk, 2 lemons, paper towels…" value="${esc(draft)}"><button class="btn" id="add-go" type="submit" ${draft.trim()?"":"disabled"}>Add</button></div>
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:8px">
-        <input id="add-qty" type="text" placeholder="Amount" autocomplete="off">
-        <select id="add-sec" aria-label="Section"><option value="">Section: guess</option>${secs.map(s => `<option>${esc(s)}</option>`).join("")}</select></div>
+      <input id="add-qty" type="text" placeholder="Amount (optional)" autocomplete="off" style="margin-top:8px">
+      <p class="small muted" style="margin:6px 0 0">The section is picked for you.</p>
     </form>
     ${usualChips}
     ${groups || `<p class="empty">The list is empty. Add something above, or send a recipe's items from Shop.</p>`}
@@ -426,7 +453,7 @@ function viewList(){
     e.preventDefault();
     const name = inp.value.trim(); if(!name) return;   // guard the handler as well as the button
     if(openOnList(name)){ toast(`${name} is already on the list.`); return; }
-    const sec = f.querySelector("#add-sec").value || guessSection(name);
+    const sec = guessSection(name);
     enqueue({op:"add", items:[{item:name, qty:f.querySelector("#add-qty").value.trim(), section:sec, store:"", note:"", tmp: tmpId()}]});
     store.set("addDraft", ""); viewList();
     const again = $app.querySelector("#add-item"); if(again) again.focus();

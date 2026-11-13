@@ -101,10 +101,9 @@ def open_page(b, init=None, width=390):
 T = 3000
 def li_text(pg): return pg.locator("[data-li]").all_inner_texts()
 def go_list(pg): pg.click("a[data-tab=list]", timeout=T); pg.wait_for_selector("#addform", timeout=T)
-def add(pg, name, qty="", sec=""):
+def add(pg, name, qty=""):
     pg.fill("#add-item", name, timeout=T)
     if qty: pg.fill("#add-qty", qty)
-    if sec: pg.select_option("#add-sec", sec)
     pg.click("#add-go", timeout=T)
 def item_id(pg, name):
     for el in pg.locator("[data-li]").all():
@@ -127,7 +126,7 @@ with sync_playwright() as p:
     check("Add is disabled until an item is typed", lambda: a.is_disabled("#add-go", timeout=T))
     check("handler is guarded too (submit with blank does nothing)", lambda: (a.eval_on_selector("#addform", "f => f.requestSubmit()"), settle(a), not [c for c in M.calls if c.get("action") == "add"])[2])
     add_ok = True
-    try: add(a, "Milk", "1 gal", "Dairy & eggs"); settle(a)
+    try: add(a, "Milk", "1 gal"); settle(a)
     except Exception: add_ok = False
     check("add writes to the endpoint with the viewer's name", lambda: add_ok and any(c.get("action") == "add" and c.get("by") == "John" and c["items"][0]["item"] == "Milk" for c in M.calls))
     check("added item shows under its section", lambda: a.locator("[data-lsec='Dairy & eggs'] [data-li]").count() == 1)
@@ -135,12 +134,17 @@ with sync_playwright() as p:
     try: add(a, "Cabbage"); settle(a)
     except Exception: pass
     check("section guessed from the Pantry (Cabbage -> Produce)", lambda: M.list[1]["Section"] == "Produce")
+    check("no section picker on the add form (sections are guessed)", lambda: a.locator("#add-sec").count() == 0)
+    try: add(a, "Bread"); settle(a)
+    except Exception: pass
+    check("a new everyday item is sorted without asking (Bread -> Bakery)", lambda: any(r["Item"] == "Bread" and r["Section"] == "Bakery" for r in M.list))
+    check("Bread shows under Bakery on screen", lambda: a.locator("[data-lsec='Bakery'] [data-li]").count() == 1)
     check("duplicate refused locally", lambda: (add(a, "milk"), settle(a), sum(1 for r in M.list if r["Item"].lower() == "milk") == 1)[2])
     # --- viewer 2: Courtney, on her own phone ---
     c2, cpg, err2 = open_page(b)
     try: cpg.click("[data-me=Courtney]", timeout=T); go_list(cpg)
     except Exception: pass
-    check("second viewer sees John's items", lambda: cpg.locator("[data-li]").count() == 2)
+    check("second viewer sees John's items", lambda: cpg.locator("[data-li]").count() == 3)
     check("second viewer sees who added it", lambda: "John" in cpg.inner_text("[data-li='G0001']", timeout=T))
     try: cpg.check("[data-ltick='G0002']", timeout=T); settle(cpg)
     except Exception: pass
