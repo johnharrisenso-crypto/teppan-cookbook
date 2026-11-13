@@ -195,6 +195,26 @@ with sync_playwright() as p:
     try: a.click("[data-send-grocery]", timeout=T); settle(a)
     except Exception: pass
     check("sending again skips what's already on the list", lambda: len(M.list) == n_before)
+    # --- stores: Andronico's by default, Nijiya from the recipe, filter by store (owner, 2026-11-13) ---
+    check("a typed item goes to Andronico's", lambda: next(r for r in M.list if r["Item"] == "Milk")["Store"] == "Andronico's")
+    check("Shop: a Nijiya pantry item is sent as Nijiya", lambda: next(r for r in M.list if r["Item"] == "Pork belly, thin-sliced")["Store"] == "Nijiya")
+    check("Shop: an 'Any grocery' pantry item is sent as Andronico's", lambda: next(r for r in M.list if r["Item"] == "Eggs")["Store"] == "Andronico's")
+    try: go_list(a); a.click("[data-lstore='Nijiya']", timeout=T); settle(a)
+    except Exception: pass
+    def only_nijiya():
+        names = [e.inner_text().strip() for e in a.locator("[data-li] .iname").all()]
+        want = sorted(r["Item"] for r in M.list if not r["Cleared"] and r["Store"] == "Nijiya")
+        return sorted(names) == want and len(want) >= 3
+    check("Nijiya filter shows only the Nijiya items", only_nijiya)
+    try: add(a, "Kewpie mayonnaise refill"); settle(a)
+    except Exception: pass
+    check("adding while viewing Nijiya puts the item on the Nijiya list", lambda: next(r for r in M.list if r["Item"] == "Kewpie mayonnaise refill")["Store"] == "Nijiya")
+    try: a.click("[data-lstore=\"Andronico's\"]", timeout=T); settle(a)
+    except Exception: pass
+    check("Andronico's filter hides the Nijiya items", lambda: "Pork belly, thin-sliced" not in a.inner_text("#app") and "Eggs" in a.inner_text("#app"))
+    try: a.click("[data-lstore='All']", timeout=T); settle(a)
+    except Exception: pass
+    check("All shows both stores again", lambda: "Pork belly, thin-sliced" in a.inner_text("#app") and "Eggs" in a.inner_text("#app"))
     # --- log: cook number and save ---
     try: a.click("a[data-tab=log]", timeout=T); a.wait_for_selector("#lg-n", timeout=T)
     except Exception: pass
@@ -237,6 +257,9 @@ with sync_playwright() as p:
     try: s.click("[data-me=John]", timeout=T); go_list(s); add(s, "Rice"); settle(s)
     except Exception: pass
     check("works with browser storage throwing (add lands)", lambda: any(r["Item"] == "Rice" for r in M.list))
+    try: s.click("[data-lstore='Nijiya']", timeout=T); settle(s)
+    except Exception: pass
+    check("store filter works with browser storage throwing", lambda: s.get_attribute("[data-lstore='Nijiya']", "aria-pressed", timeout=T) == "true" and "Rice" not in s.inner_text("#app"))
     check("no page errors with storage throwing", lambda: not err3)
     b.close()
 srv.shutdown()

@@ -29,7 +29,7 @@ sub('<meta name="claude:viewport-fit-sides" content="cover">',
     '<meta name="apple-mobile-web-app-title" content="Cookbook">\n<meta name="apple-mobile-web-app-status-bar-style" content="default">\n'
     '<meta name="theme-color" content="#EEF0EC">\n<link rel="icon" type="image/png" href="apple-touch-icon.png">')
 sub("/* Version 3 (CS-066, 2026-11-05):",
-    "/* Teppan Cookbook version 0.7.2 (CS-066, 2026-11-13: sections guessed for everyday items, no section picker). 0.7.1 (2026-11-12: a list read in flight no longer hides a just-added item; Loading text; favicon). 0.7 (2026-11-11): standalone app on Netlify; data through the Apps Script endpoint (no Claude or Google sign-in); new List tab, the shared grocery list. Built from Teppan Notebook version 3 by build.py. */\n/* Notebook version 3 (CS-066, 2026-11-05):")
+    "/* Teppan Cookbook version 0.7.3 (CS-066, 2026-11-13: Andronico's is the default store; List filter by store). 0.7.2 (2026-11-13: sections guessed for everyday items, no section picker). 0.7.1 (2026-11-12: a list read in flight no longer hides a just-added item; Loading text; favicon). 0.7 (2026-11-11): standalone app on Netlify; data through the Apps Script endpoint (no Claude or Google sign-in); new List tab, the shared grocery list. Built from Teppan Notebook version 3 by build.py. */\n/* Notebook version 3 (CS-066, 2026-11-05):")
 
 # --- five tabs ---
 sub("grid-template-columns:repeat(4,1fr)", "grid-template-columns:repeat(5,1fr)")
@@ -86,7 +86,7 @@ function sendToGrocery(need, got){
       const isAmt = p.buy === "amount";
       let qty = isAmt ? Object.entries(e.qty).map(([u,q]) => fmtAmount(q,u).main).join(" + ") : "";
       if(isAmt && p.id === "P16" && e.qty.g) qty += ` (about ${frac(e.qty.g / CABBAGE_HEAD_G).txt} head)`;
-      const store_ = /any grocery/i.test(p.where) ? "" : "Nijiya";
+      const store_ = /any grocery/i.test(p.where) ? DEFAULT_STORE : "Nijiya";   // Pantry 'Any grocery' means the everyday store
       const note = [isAmt ? "" : "stock item: check what's left", p.look, p.where, "for " + [...e.recipes].join(", ")].filter(Boolean).join(" · ");
       send.push({item:p.item, qty, section:p.section, store:store_, note, tmp: tmpId()});
     });

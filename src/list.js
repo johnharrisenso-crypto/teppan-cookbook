@@ -157,18 +157,32 @@ function guessSection(name){
   return guessByWords(name);
 }
 
+/* Stores (CS-066, 0.7.3, owner 2026-11-13): everything is bought at Andronico's unless a recipe's Pantry item says
+   otherwise (Nijiya for the okonomiyaki specialties). A blank Store means Andronico's. The List filters by store;
+   a typed item goes to the store being viewed, or Andronico's when viewing All. */
+const DEFAULT_STORE = "Andronico's";
+function storeOf(x){ return String(x.Store || "").trim() || DEFAULT_STORE; }
+function storesPresent(items){ const s = new Set([DEFAULT_STORE, "Nijiya"]); items.forEach(x => s.add(storeOf(x))); return [...s]; }
+let storeFilterMem = null;   // keeps the filter when browser storage is blocked
+function storeFilter(){ return store.get("storeFilter", null) || storeFilterMem || "All"; }
 function viewList(){
   if(!L){ $app.innerHTML = `<div class="view">${listTop()}<p class="empty">The list hasn't loaded yet. It needs a signal the first time.</p></div>`; wireListTop(); return; }
   const open = store.get("listOpen", null);
   const secs = [...L.sections].sort((a,b) => a.Order - b.Order).map(s => s.Section);
   const known = new Set(secs);
-  const items = L.list.filter(x => !x.Cleared);
+  const allItems = L.list.filter(x => !x.Cleared);
+  const stores = storesPresent(allItems);
+  let filt = storeFilter(); if(filt !== "All" && !stores.includes(filt)) filt = "All";
+  const items = filt === "All" ? allItems : allItems.filter(x => storeOf(x) === filt);
+  const openCount = st => allItems.filter(x => !x.Done && (st === "All" || storeOf(x) === st)).length;
+  const storeChips = `<div class="row-wrap" style="margin:0 0 12px" role="group" aria-label="Store">${["All", ...stores].map(st =>
+    `<button class="chip ${st === filt ? "nori" : ""}" data-lstore="${esc(st)}" aria-pressed="${st === filt}">${esc(st)} <span>${openCount(st)}</span></button>`).join("")}</div>`;
   const groups = [...secs, "Other"].map(s => {
     const its = items.filter(x => (known.has(x.Section) ? x.Section : "Other") === s).sort((a,b) => (a.Done?1:0) - (b.Done?1:0));
     if(!its.length) return "";
     return `<div class="card sh-sec" data-lsec="${esc(s)}"><h3 style="margin-bottom:6px">${esc(s)}</h3>${its.map(x => {
       const isOpen = open === x.ID;
-      const meta = [x.Qty, x.Store].filter(Boolean).join(" · ");
+      const meta = [x.Qty, storeOf(x) !== DEFAULT_STORE && filt === "All" ? storeOf(x) : ""].filter(Boolean).join(" · ");
       return `<div class="item ${x.Done?"got":""}" data-li="${esc(x.ID)}">
         <input type="checkbox" data-ltick="${esc(x.ID)}" ${x.Done?"checked":""} aria-label="Got ${esc(x.Item)}">
         <button class="stxt" data-lopen="${esc(x.ID)}"><span class="iname">${esc(x.Item)}</span>${meta?` <span class="muted small">${esc(meta)}</span>`:""}${x.Note && !isOpen?`<div class="where">${esc(x.Note.length > 70 ? x.Note.slice(0,70) + "…" : x.Note)}</div>`:""}</button>
@@ -180,7 +194,7 @@ function viewList(){
       </div>`;
     }).join("")}</div>`;
   }).join("");
-  const done = items.filter(x => x.Done).length;
+  const done = allItems.filter(x => x.Done).length;   // Clear clears every ticked item, whatever the filter
   const usualChips = L.usual.length ? `<details class="sec" data-usuals ${store.get("usualsOpen", false)?"open":""}><summary><h2>Usuals</h2><span class="cnt">${L.usual.length}</span></summary><div class="sec-body"><p class="small muted" style="margin:0 0 8px">Tap to put one on the list. Star an item on the list to add it here.</p><div class="row-wrap">${L.usual.map(u => {
       const on = !!openOnList(u.Item);
       return `<button class="chip ${on?"nori":""}" data-uadd="${esc(u.Item)}" ${on?"disabled":""}>${on?"✓ ":"+ "}${esc(u.Item)}</button>`;
@@ -191,10 +205,11 @@ function viewList(){
       <label class="f" for="add-item" style="margin-top:0">Add to the list</label>
       <div style="display:grid;grid-template-columns:1fr auto;gap:8px"><input id="add-item" type="text" autocomplete="off" enterkeyhint="done" placeholder="Milk, 2 lemons, paper towels…" value="${esc(draft)}"><button class="btn" id="add-go" type="submit" ${draft.trim()?"":"disabled"}>Add</button></div>
       <input id="add-qty" type="text" placeholder="Amount (optional)" autocomplete="off" style="margin-top:8px">
-      <p class="small muted" style="margin:6px 0 0">The section is picked for you.</p>
+      <p class="small muted" style="margin:6px 0 0" data-addto>Goes on the ${esc(filt === "All" ? DEFAULT_STORE : filt)} list. The section is picked for you.</p>
     </form>
     ${usualChips}
-    ${groups || `<p class="empty">The list is empty. Add something above, or send a recipe's items from Shop.</p>`}
+    ${storeChips}
+    ${groups || (filt === "All" ? `<p class="empty">The list is empty. Add something above, or send a recipe's items from Shop.</p>` : `<p class="empty">Nothing for ${esc(filt)}.</p>`)}
     ${done ? `<p style="text-align:center"><button class="iconbtn" data-lclear>Clear ${done} ticked item${done===1?"":"s"}</button></p>` : ""}
     <p class="small muted" style="text-align:center">This phone: ${esc(me() || "not set")} · <button class="back" data-changeme>change</button></p></div>`;
   wireListTop();
@@ -205,10 +220,11 @@ function viewList(){
     const name = inp.value.trim(); if(!name) return;   // guard the handler as well as the button
     if(openOnList(name)){ toast(`${name} is already on the list.`); return; }
     const sec = guessSection(name);
-    enqueue({op:"add", items:[{item:name, qty:f.querySelector("#add-qty").value.trim(), section:sec, store:"", note:"", tmp: tmpId()}]});
+    enqueue({op:"add", items:[{item:name, qty:f.querySelector("#add-qty").value.trim(), section:sec, store: filt === "All" ? DEFAULT_STORE : filt, note:"", tmp: tmpId()}]});
     store.set("addDraft", ""); viewList();
     const again = $app.querySelector("#add-item"); if(again) again.focus();
   };
+  $app.querySelectorAll("[data-lstore]").forEach(b => b.onclick = () => { store.set("storeFilter", b.dataset.lstore); storeFilterMem = b.dataset.lstore; viewList(); });
   $app.querySelectorAll("[data-ltick]").forEach(c => c.onchange = () => { enqueue({op:"tick", id:c.dataset.ltick, done:c.checked}); viewList(); });
   $app.querySelectorAll("[data-lopen]").forEach(b => b.onclick = () => { store.set("listOpen", open === b.dataset.lopen ? null : b.dataset.lopen); viewList(); });
   $app.querySelectorAll("[data-lremove]").forEach(b => b.onclick = () => { enqueue({op:"remove", id:b.dataset.lremove}); store.set("listOpen", null); viewList(); });
@@ -219,7 +235,7 @@ function viewList(){
   });
   $app.querySelectorAll("[data-uadd]").forEach(b => b.onclick = () => {
     const u = L.usual.find(y => y.Item === b.dataset.uadd); if(!u || openOnList(u.Item)) return;
-    enqueue({op:"add", items:[{item:u.Item, qty:u.Qty, section:u.Section, store:u.Store, note:"", tmp: tmpId()}]}); viewList();
+    enqueue({op:"add", items:[{item:u.Item, qty:u.Qty, section:u.Section, store: storeOf(u), note:"", tmp: tmpId()}]}); viewList();
   });
   const us = $app.querySelector("[data-usuals]"); if(us) us.addEventListener("toggle", () => store.set("usualsOpen", us.open));
   const cl = $app.querySelector("[data-lclear]"); if(cl) cl.onclick = () => { enqueue({op:"clear"}); viewList(); };
