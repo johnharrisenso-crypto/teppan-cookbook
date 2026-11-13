@@ -7,11 +7,12 @@
 <meta name="apple-mobile-web-app-title" content="Cookbook">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="theme-color" content="#EEF0EC">
+<link rel="icon" type="image/png" href="apple-touch-icon.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Zen+Maru+Gothic:wght@500;700&family=IBM+Plex+Sans:wght@400;500;600&family=Zen+Kaku+Gothic+New:wght@400;500&display=swap" rel="stylesheet">
 <style>
-/* Teppan Cookbook version 0.7 (CS-066, 2026-11-11): standalone app on Netlify; data through the Apps Script endpoint (no Claude or Google sign-in); new List tab, the shared grocery list. Built from Teppan Notebook version 3 by build.py. */
+/* Teppan Cookbook version 0.7.1 (CS-066, 2026-11-12: a list read in flight no longer hides a just-added item; Loading text; favicon). 0.7 (2026-11-11): standalone app on Netlify; data through the Apps Script endpoint (no Claude or Google sign-in); new List tab, the shared grocery list. Built from Teppan Notebook version 3 by build.py. */
 /* Notebook version 3 (CS-066, 2026-11-05): Shop sends unchecked items to the shared Grocery list sheet; Cook # suggests max cook number + 1 (ISS-071). */
 /* Version 2 (CS-063, 2026-11-01): amounts shown under each step, scaled; totals in the ingredient's own unit. */
 /* Layout: one column, phone first; a bottom tab bar like a counter's order slips (Recipes, Shop, Log, Learn). */
@@ -276,6 +277,7 @@ function askMe(then){
 /* ---------- shared grocery list: optimistic, queued, works offline ---------- */
 let Q = null;            // pending changes, oldest first; kept in memory, mirrored to storage
 let flushing = false, listAt = null;
+let listGen = 0;        // bumped on every local change and every saved change; a list read that started before a bump is stale and is dropped
 function qLoad(){ if(Q === null) Q = store.get("queue", []) || []; return Q; }
 function qSave(){ store.set("queue", Q); }
 function pending(){ return qLoad().length; }
@@ -303,7 +305,7 @@ function applyLocal(op){
 }
 function enqueue(op){
   op.at = stamp(); op.by = me() || "";
-  qLoad().push(op); qSave();
+  qLoad().push(op); qSave(); listGen++;
   applyLocal(op); cacheList();
   flush();
 }
@@ -334,7 +336,7 @@ async function flush(){
         if(e && e.offline) break;                        // keep it; try again when the signal is back
         toast("Couldn't save a change: " + errText(e));    // the server refused it: drop it so the rest can go
       }
-      Q.shift();
+      Q.shift(); listGen++;
       if(op.op === "add" && res && res.map){             // swap temporary ids for the real ones everywhere
         Object.entries(res.map).forEach(([t, id]) => {
           Q.forEach(o => { if(o.id === t) o.id = id; });
@@ -351,8 +353,10 @@ async function flush(){
 }
 async function refreshList(quiet){
   if(pending() || flushing) return;
+  const gen = listGen;
   try{
     const s = await api({action:"state"}, 20000);
+    if(gen !== listGen || pending() || flushing) return;   // a change happened while this read was in flight
     L = {list: s.list, usual: s.usual, sections: s.sections}; listAt = new Date(); cacheList();
     if(route() === "list") viewList();
   }catch(e){ if(!quiet) toast(errText(e)); updateListStatus(); }
@@ -476,12 +480,13 @@ function shape(raw){
   return {recipes, ingredients, steps, pantry, glossary, cooks};
 }
 async function loadAll(){
+  const gen = listGen;
   try{
     const s = await api({action:"state", recipes:true});
     const problems = Object.keys(TABS).map(n => checkHead(n, (s.raw[n] || [])[0] || [])).filter(Boolean);
     if(problems.length) throw {message: problems.join(" ")};
     D = shape(s.raw); syncedAt = new Date(); store.set("cache", {raw: s.raw, at: syncedAt.toISOString()});
-    if(!pending()){ L = {list: s.list, usual: s.usual, sections: s.sections}; listAt = new Date(); cacheList(); }
+    if(gen === listGen && !pending() && !flushing){ L = {list: s.list, usual: s.usual, sections: s.sections}; listAt = new Date(); cacheList(); }
     hideBanner();
   }catch(e){
     const c = store.get("cache", null);
@@ -501,7 +506,7 @@ function render(){
   const r = route(), tab = r.startsWith("recipe-") ? "recipes" : r;
   document.querySelectorAll("nav.tabs a").forEach(a => a.setAttribute("aria-current", a.dataset.tab === tab ? "page" : "false"));
   if(r === "list") return viewList();
-  if(!D){ $app.innerHTML = `<p class="empty">No recipes on this phone yet. They load the first time there is a signal.</p>`; return; }
+  if(!D){ $app.innerHTML = `<p class="empty">Loading recipes… The first time needs a signal; after that this phone keeps a copy.</p>`; return; }
   if(r.startsWith("recipe-")) return viewRecipe(r.slice(7).toUpperCase());
   if(r === "shop") return viewShop();
   if(r === "log") return viewLog();

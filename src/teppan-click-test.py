@@ -207,6 +207,27 @@ with sync_playwright() as p:
         check(f"390 px: no horizontal scroll on {name}", lambda: pg.evaluate("document.documentElement.scrollWidth <= window.innerWidth"))
     check("no page errors (John)", lambda: not err1)
     check("no page errors (Courtney)", lambda: not err2)
+    # --- slow list read in flight while adding (live bug 2026-11-12: the item vanished until the save finished) ---
+    SLOW_STATE = """(() => { const f = window.fetch.bind(window);
+      window.fetch = async (u, o) => { const r = await f(u, o);
+        try { if (window.__slowState && o && JSON.parse(o.body).action === 'state') { const t = await r.clone().text();
+          await new Promise(z => setTimeout(z, 1200)); return new Response(t, {status: r.status, headers: {'Content-Type': 'application/json'}}); } } catch (e) {}
+        return r; }; })();"""
+    c4, sl, err4 = open_page(b, init=SLOW_STATE + "localStorage.setItem('teppan:me', JSON.stringify('John'));")
+    missing = None
+    try:
+        sl.wait_for_selector("[data-recipe=OKO]", timeout=T); go_list(sl)
+        sl.evaluate("window.__slowState = true")
+        sl.click("[data-lrefresh]", timeout=T)            # a slow read starts, without the new item
+        sl.wait_for_timeout(100)
+        add(sl, "Butter")
+        missing = sl.evaluate("""async () => { let gone = 0; for (let i = 0; i < 35; i++) {
+            if (![...document.querySelectorAll('[data-li] .iname')].some(e => e.textContent.trim() === 'Butter')) gone++;
+            await new Promise(z => setTimeout(z, 100)); } return gone; }""")
+    except Exception:
+        pass
+    check("an item added while a slow list read is in flight never disappears", lambda: missing == 0)
+    check("no page errors (slow read)", lambda: not err4)
     # --- storage throwing ---
     c3, s, err3 = open_page(b, init=STORAGE_THROWS)
     try: s.click("[data-me=John]", timeout=T); go_list(s); add(s, "Rice"); settle(s)

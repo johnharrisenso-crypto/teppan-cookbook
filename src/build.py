@@ -27,9 +27,9 @@ sub('<meta name="claude:viewport-fit-sides" content="cover">',
     '<link rel="manifest" href="manifest.json">\n<link rel="apple-touch-icon" href="apple-touch-icon.png">\n'
     '<meta name="apple-mobile-web-app-capable" content="yes">\n<meta name="mobile-web-app-capable" content="yes">\n'
     '<meta name="apple-mobile-web-app-title" content="Cookbook">\n<meta name="apple-mobile-web-app-status-bar-style" content="default">\n'
-    '<meta name="theme-color" content="#EEF0EC">')
+    '<meta name="theme-color" content="#EEF0EC">\n<link rel="icon" type="image/png" href="apple-touch-icon.png">')
 sub("/* Version 3 (CS-066, 2026-11-05):",
-    "/* Teppan Cookbook version 0.7 (CS-066, 2026-11-11): standalone app on Netlify; data through the Apps Script endpoint (no Claude or Google sign-in); new List tab, the shared grocery list. Built from Teppan Notebook version 3 by build.py. */\n/* Notebook version 3 (CS-066, 2026-11-05):")
+    "/* Teppan Cookbook version 0.7.1 (CS-066, 2026-11-12: a list read in flight no longer hides a just-added item; Loading text; favicon). 0.7 (2026-11-11): standalone app on Netlify; data through the Apps Script endpoint (no Claude or Google sign-in); new List tab, the shared grocery list. Built from Teppan Notebook version 3 by build.py. */\n/* Notebook version 3 (CS-066, 2026-11-05):")
 
 # --- five tabs ---
 sub("grid-template-columns:repeat(4,1fr)", "grid-template-columns:repeat(5,1fr)")
@@ -46,12 +46,13 @@ sub("let mcp = null, D = null, syncedAt = null, saving = false;", "let D = null,
 sub_re(r'/\* ---------- connector ---------- \*/.*?(?=\nfunction checkHead)', L)
 sub_re(r'async function loadAll\(\)\{.*?\n\}\nlet refreshing = false;',
        '''async function loadAll(){
+  const gen = listGen;
   try{
     const s = await api({action:"state", recipes:true});
     const problems = Object.keys(TABS).map(n => checkHead(n, (s.raw[n] || [])[0] || [])).filter(Boolean);
     if(problems.length) throw {message: problems.join(" ")};
     D = shape(s.raw); syncedAt = new Date(); store.set("cache", {raw: s.raw, at: syncedAt.toISOString()});
-    if(!pending()){ L = {list: s.list, usual: s.usual, sections: s.sections}; listAt = new Date(); cacheList(); }
+    if(gen === listGen && !pending() && !flushing){ L = {list: s.list, usual: s.usual, sections: s.sections}; listAt = new Date(); cacheList(); }
     hideBanner();
   }catch(e){
     const c = store.get("cache", null);
@@ -65,7 +66,7 @@ sub("try{ await loadAll(); render(); } finally { refreshing = false; }", "try{ a
 
 # --- routes ---
 sub('if(!D){ $app.innerHTML = `<p class="empty">No data yet. Tap Refresh once Google Sheets is connected.</p>`; return; }',
-    'if(r === "list") return viewList();\n  if(!D){ $app.innerHTML = `<p class="empty">No recipes on this phone yet. They load the first time there is a signal.</p>`; return; }')
+    'if(r === "list") return viewList();\n  if(!D){ $app.innerHTML = `<p class="empty">Loading recipes… The first time needs a signal; after that this phone keeps a copy.</p>`; return; }')
 
 # --- Shop: send to the shared list through the same queue as the List tab (works offline) ---
 sub('Adds what isn\'t ticked here to the shared Groceries list (the one Courtney sees). Items already on it are skipped.',

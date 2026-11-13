@@ -28,6 +28,7 @@ function askMe(then){
 /* ---------- shared grocery list: optimistic, queued, works offline ---------- */
 let Q = null;            // pending changes, oldest first; kept in memory, mirrored to storage
 let flushing = false, listAt = null;
+let listGen = 0;        // bumped on every local change and every saved change; a list read that started before a bump is stale and is dropped
 function qLoad(){ if(Q === null) Q = store.get("queue", []) || []; return Q; }
 function qSave(){ store.set("queue", Q); }
 function pending(){ return qLoad().length; }
@@ -55,7 +56,7 @@ function applyLocal(op){
 }
 function enqueue(op){
   op.at = stamp(); op.by = me() || "";
-  qLoad().push(op); qSave();
+  qLoad().push(op); qSave(); listGen++;
   applyLocal(op); cacheList();
   flush();
 }
@@ -86,7 +87,7 @@ async function flush(){
         if(e && e.offline) break;                        // keep it; try again when the signal is back
         toast("Couldn't save a change: " + errText(e));    // the server refused it: drop it so the rest can go
       }
-      Q.shift();
+      Q.shift(); listGen++;
       if(op.op === "add" && res && res.map){             // swap temporary ids for the real ones everywhere
         Object.entries(res.map).forEach(([t, id]) => {
           Q.forEach(o => { if(o.id === t) o.id = id; });
@@ -103,8 +104,10 @@ async function flush(){
 }
 async function refreshList(quiet){
   if(pending() || flushing) return;
+  const gen = listGen;
   try{
     const s = await api({action:"state"}, 20000);
+    if(gen !== listGen || pending() || flushing) return;   // a change happened while this read was in flight
     L = {list: s.list, usual: s.usual, sections: s.sections}; listAt = new Date(); cacheList();
     if(route() === "list") viewList();
   }catch(e){ if(!quiet) toast(errText(e)); updateListStatus(); }
