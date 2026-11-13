@@ -1,0 +1,622 @@
+<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
+<title>Teppan Notebook</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Zen+Maru+Gothic:wght@500;700&family=IBM+Plex+Sans:wght@400;500;600&family=Zen+Kaku+Gothic+New:wght@400;500&display=swap" rel="stylesheet">
+<style>
+/* Version 3 (CS-066, 2026-11-05): Shop sends unchecked items to the shared Grocery list sheet; Cook # suggests max cook number + 1 (ISS-071). */
+/* Version 2 (CS-063, 2026-11-01): amounts shown under each step, scaled; totals in the ingredient's own unit. */
+/* Layout: one column, phone first; a bottom tab bar like a counter's order slips (Recipes, Shop, Log, Learn). */
+:root{
+  --bg:#EEF0EC; --surface:#FFFFFF; --sunk:#E3E7E1; --ink:#1D2330; --muted:#5F6876; --line:#D2D8D0;
+  --nori:#2F6B3A; --nori-soft:#DDEBDD; --beni:#C8324A; --beni-soft:#F7E1E5; --sauce:#5B3A22;
+  --display:"Zen Maru Gothic","Zen Kaku Gothic New","Hiragino Maru Gothic ProN",system-ui,sans-serif;
+  --body:"IBM Plex Sans","Zen Kaku Gothic New","Hiragino Sans",system-ui,sans-serif;
+  --jp:"Zen Kaku Gothic New","Hiragino Sans","Yu Gothic",sans-serif;
+  --r:14px; --r-s:9px;
+}
+@media (prefers-color-scheme: dark){ :root:not([data-theme="light"]){
+  --bg:#12161D; --surface:#1B212B; --sunk:#232A35; --ink:#E7EAEE; --muted:#9AA3AF; --line:#2E3643;
+  --nori:#7CC489; --nori-soft:#21362A; --beni:#F0778A; --beni-soft:#3B2228; --sauce:#D6A57D; color-scheme:dark } }
+:root[data-theme="dark"]{
+  --bg:#12161D; --surface:#1B212B; --sunk:#232A35; --ink:#E7EAEE; --muted:#9AA3AF; --line:#2E3643;
+  --nori:#7CC489; --nori-soft:#21362A; --beni:#F0778A; --beni-soft:#3B2228; --sauce:#D6A57D; color-scheme:dark }
+*,*::before,*::after{box-sizing:border-box}
+body{background:var(--bg);color:var(--ink);font-family:var(--body);font-size:16px;line-height:1.5;-webkit-font-smoothing:antialiased;
+  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:0 calc(84px + env(safe-area-inset-bottom,0px))}
+button,input,textarea,select{font:inherit;color:inherit}
+button{cursor:pointer}
+:focus-visible{outline:2px solid var(--nori);outline-offset:2px}
+.jp{font-family:var(--jp)}
+.wrap{max-width:620px;margin:0 auto;padding-top:12px}
+h1,h2,h3{font-family:var(--display);text-wrap:balance;margin:0}
+h1{font-size:30px;font-weight:700;letter-spacing:.01em}
+h2{font-size:20px;font-weight:700}
+h3{font-size:13px;font-weight:600;font-family:var(--body);text-transform:uppercase;letter-spacing:.08em;color:var(--muted)}
+.muted{color:var(--muted)}
+.small{font-size:13px}
+.top{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:6px 0 14px}
+.sync{font-size:12px;color:var(--muted);display:flex;gap:8px;align-items:center}
+.iconbtn{border:1px solid var(--line);background:var(--surface);border-radius:999px;padding:6px 12px;font-size:13px;font-weight:500}
+.banner{background:var(--beni-soft);border-radius:var(--r-s);padding:12px 14px;margin:0 0 12px;font-size:15px}
+.banner button{margin-top:8px}
+.card{background:var(--surface);border-radius:var(--r);padding:16px;margin-bottom:12px}
+.rcard{display:flex;flex-direction:column;gap:4px;width:100%;text-align:left;border:0;background:var(--surface);border-radius:var(--r);padding:18px 16px}
+.rcard .name{font-family:var(--display);font-size:22px;font-weight:700}
+.chip{display:inline-flex;align-items:center;gap:6px;border-radius:999px;padding:3px 10px;font-size:12px;font-weight:600;background:var(--sunk);color:var(--muted)}
+.chip.nori{background:var(--nori-soft);color:var(--nori)}
+.chip.beni{background:var(--beni-soft);color:var(--beni)}
+.row-wrap{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.back{border:0;background:none;color:var(--nori);font-weight:600;padding:6px 0}
+.hero{padding:4px 0 14px}
+.hero .ja{font-family:var(--jp);color:var(--muted);font-size:15px}
+.controls{display:flex;flex-wrap:wrap;gap:10px;align-items:center;justify-content:space-between}
+.stepper{display:flex;align-items:center;gap:8px}
+.stepper button{width:40px;height:40px;border-radius:50%;border:1px solid var(--line);background:var(--surface);font-size:20px;font-weight:600}
+.stepper output{min-width:96px;text-align:center;font-weight:600;font-variant-numeric:tabular-nums}
+.seg{display:inline-flex;background:var(--sunk);border-radius:999px;padding:3px}
+.seg button{border:0;background:none;border-radius:999px;padding:6px 12px;font-size:13px;font-weight:600;color:var(--muted)}
+.seg button[aria-pressed="true"]{background:var(--surface);color:var(--ink)}
+.note{background:var(--nori-soft);border-radius:var(--r-s);padding:12px 14px;font-size:15px}
+.note b{color:var(--nori)}
+details.sec{background:var(--surface);border-radius:var(--r);margin-bottom:12px}
+details.sec>summary{list-style:none;display:flex;justify-content:space-between;align-items:center;padding:16px;cursor:pointer}
+details.sec>summary::-webkit-details-marker{display:none}
+details.sec>summary h2{font-size:19px}
+details.sec>summary .cnt{font-size:13px;color:var(--muted)}
+details.sec>summary::after{content:"+";font-size:22px;color:var(--muted);margin-left:10px}
+details.sec[open]>summary::after{content:"−"}
+.sec-body{padding:0 16px 14px}
+.grp{margin:6px 0 14px}
+.grp h3{margin:8px 0 4px}
+.ing{border-top:1px solid var(--line)}
+.ing>button{display:grid;grid-template-columns:1fr auto;gap:2px 12px;width:100%;text-align:left;border:0;background:none;padding:10px 0}
+.ing .nm{font-weight:500}
+.ing .lf{font-size:13px;color:var(--muted);grid-column:1}
+.amt{text-align:right;font-variant-numeric:tabular-nums;font-weight:600;white-space:nowrap}
+.amt small{display:block;font-weight:400;color:var(--muted);font-size:12px}
+.us{color:var(--muted);font-weight:400;font-size:12px}
+.more{font-size:14px;color:var(--ink);background:var(--sunk);border-radius:var(--r-s);padding:10px 12px;margin:0 0 10px}
+.more p{margin:0 0 6px}.more p:last-child{margin:0}
+.more .k{font-weight:600;color:var(--muted);font-size:12px;text-transform:uppercase;letter-spacing:.06em}
+ol.steps{list-style:none;margin:0;padding:0;counter-reset:s}
+ol.steps li{border-top:1px solid var(--line);padding:10px 0}
+ol.steps li:first-child{border-top:0}
+.st{display:grid;grid-template-columns:28px 1fr;gap:10px;align-items:start}
+.tick{width:26px;height:26px;border-radius:50%;border:2px solid var(--line);background:none;font-size:13px;font-weight:700;color:var(--muted);display:grid;place-items:center;padding:0}
+li.done .tick{background:var(--nori);border-color:var(--nori);color:var(--surface)}
+li.done .stxt{color:var(--muted);text-decoration:line-through;text-decoration-color:var(--line)}
+.stxt{border:0;background:none;text-align:left;padding:0;width:100%}
+.timer{margin:8px 0 0 38px;border:1px solid var(--line);background:var(--surface);border-radius:999px;padding:5px 12px;font-size:13px;font-weight:600;font-variant-numeric:tabular-nums}
+.timer.run{background:var(--beni);color:#fff;border-color:var(--beni)}
+.timer.end{background:var(--nori);color:#fff;border-color:var(--nori)}
+.st-more{margin:8px 0 0 38px}
+.st-ings{list-style:none;margin:6px 0 0 38px;padding:0;font-size:14px}
+.st-ings li{display:flex;justify-content:space-between;gap:10px;padding:2px 0;border-top:1px dashed var(--line)}
+.st-ings li:first-child{border-top:0}
+.st-ings .nm{color:var(--muted)}
+.st-ings .amt{text-align:right;white-space:normal;flex:0 1 auto}
+.st-ings .nm{flex:1 0 auto}
+ul.plain{margin:0;padding-left:18px}
+/* shop */
+.sh-sec{margin-bottom:12px}
+.item{display:grid;grid-template-columns:28px 1fr auto;gap:2px 10px;align-items:start;border-top:1px solid var(--line);padding:10px 0}
+.item:first-of-type{border-top:0}
+.item input{width:22px;height:22px;margin:2px 0 0;accent-color:var(--nori)}
+.item.got .iname{color:var(--muted);text-decoration:line-through}
+.iname{font-weight:500}
+.where{font-size:13px;color:var(--muted)}
+.rq{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:8px 0;border-top:1px solid var(--line)}
+.rq:first-child{border-top:0}
+/* log */
+label.f{display:block;font-size:14px;color:var(--muted);margin:12px 0 6px}
+textarea,input[type=text],input[type=date],select{width:100%;border:1px solid var(--line);border-radius:var(--r-s);background:var(--bg);padding:10px 12px}
+textarea{min-height:64px;resize:vertical}
+.btn{border:0;border-radius:var(--r-s);padding:12px 16px;font-weight:600;background:var(--nori);color:var(--surface)}
+.btn.wide{width:100%;padding:14px;font-size:17px}
+.btn[disabled]{opacity:.55}
+.scores{display:flex;gap:8px}
+.scores button{flex:1;border:1px solid var(--line);background:var(--surface);border-radius:var(--r-s);padding:10px 0;font-weight:600}
+.scores button[aria-pressed="true"]{background:var(--ink);color:var(--surface);border-color:var(--ink)}
+.cook{border-top:1px solid var(--line);padding:12px 0}
+.cook:first-child{border-top:0}
+.cook dl{display:grid;grid-template-columns:96px 1fr;gap:4px 10px;margin:6px 0 0;font-size:14px}
+.cook dt{color:var(--muted)}
+.cook dd{margin:0}
+/* learn */
+.gl{border-top:1px solid var(--line);padding:10px 0}
+.gl:first-child{border-top:0}
+.gl b{font-family:var(--display)}
+table.conv{width:100%;border-collapse:collapse;font-variant-numeric:tabular-nums;font-size:14px}
+table.conv td{padding:6px 0;border-top:1px solid var(--line)}
+table.conv td:last-child{text-align:right;color:var(--muted)}
+/* tab bar */
+nav.tabs{position:fixed;left:0;right:0;bottom:0;background:var(--surface);border-top:1px solid var(--line);display:flex;justify-content:center;
+  padding:6px max(8px,env(safe-area-inset-right,0px)) calc(6px + env(safe-area-inset-bottom,0px)) max(8px,env(safe-area-inset-left,0px));z-index:5}
+nav.tabs .in{display:grid;grid-template-columns:repeat(4,1fr);width:100%;max-width:620px}
+nav.tabs a{display:flex;flex-direction:column;align-items:center;gap:1px;text-decoration:none;color:var(--muted);font-size:12px;font-weight:600;padding:6px 0;border-radius:10px}
+nav.tabs a .k{font-family:var(--jp);font-size:17px;font-weight:500;line-height:1.1}
+nav.tabs a[aria-current="page"]{color:var(--nori);background:var(--nori-soft)}
+.toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(88px + env(safe-area-inset-bottom,0px));background:var(--ink);color:var(--surface);padding:11px 16px;border-radius:12px;font-weight:500;max-width:92vw;z-index:10}
+.empty{padding:24px 4px;color:var(--muted)}
+@media (prefers-reduced-motion:no-preference){.view{animation:in .16s ease-out}@keyframes in{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:none}}}
+</style>
+
+<div class="wrap">
+  <div id="banner" class="banner" role="status" hidden></div>
+  <main id="app" aria-live="polite"><p class="empty">Opening your notebook…</p></main>
+</div>
+<div id="toast" class="toast" role="status" hidden></div>
+<nav class="tabs" aria-label="Sections"><div class="in">
+  <a href="#recipes" data-tab="recipes"><span class="k">料理</span>Recipes</a>
+  <a href="#shop" data-tab="shop"><span class="k">買物</span>Shop</a>
+  <a href="#log" data-tab="log"><span class="k">記録</span>Log</a>
+  <a href="#learn" data-tab="learn"><span class="k">学ぶ</span>Learn</a>
+</div></nav>
+
+<script>
+const SHEET_ID = "1PQas1S5aXxoIXJlkSt1e-9BhjS0KEXLjEPqoL6T9ZZo";
+const SERVER = "Google Sheets";
+const GROCERY_ID = "1KxlIa3BW6oNmaBci59vc5kcs3fVxswmQpJEHcLd1OZo"; // COK-003 Grocery list, List!A:L (shared with Courtney)
+const GROCERY_HEAD = ["ID","Item","Qty","Section","Store","Note","Added by","Added","Done","Done by","Done at","Cleared"];
+const TABS = {
+  Recipes:     {range:"Recipes!A1:M200",     head:["ID","Name","Japanese","Version","Unit","Unit plural","Default servings","Style","Why it works","Source","Equipment","What changed in this version","Status"]},
+  Ingredients: {range:"Ingredients!A1:K1000", head:["Recipe","Order","Group","Item","Look for","Per serving","Unit","Prep","Pantry ID","Why (detail)","Note"]},
+  Steps:       {range:"Steps!A1:H1000",       head:["Recipe","Phase","Order","Step","Detail","Timer (min)","Glossary","Ingredients"]},
+  Pantry:      {range:"Pantry!A1:L500",       head:["#","Item","Look for (Japanese)",null,"Where in Nijiya",null,"Notes","Recipes","Pantry ID","Section","Buy by","Keep"]},
+  Glossary:    {range:"Glossary!A1:D500",     head:["Term","Japanese","Kind","Meaning"]},
+  Cooks:       {range:"Cooks!A1:I5000",       head:["Date","Recipe","Cook #",null,null,"Her reaction",null,"Next time try","Recipe ID"]}
+};
+const SECTION_ORDER = ["Produce","Meat","Refrigerated and pickles","Dry goods","Sauces and seasonings","Home staples"];
+const PER_BOWL = new Set(["Fillings","On top while cooking","Finish","Griddle"]);
+const CABBAGE_HEAD_G = 900; // owner, cook 1: 300 g is about 1/3 of a head
+
+let mcp = null, D = null, syncedAt = null, saving = false;
+const $app = document.getElementById("app");
+const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const store = {
+  get(k, d){ try{ const v = localStorage.getItem("teppan:"+k); return v==null ? d : JSON.parse(v); }catch{ return d; } },
+  set(k, v){ try{ localStorage.setItem("teppan:"+k, JSON.stringify(v)); }catch{} }
+};
+
+/* ---------- amounts ---------- */
+const FR = [[0,""],[0.125,"⅛"],[0.25,"¼"],[1/3,"⅓"],[0.5,"½"],[2/3,"⅔"],[0.75,"¾"],[1,""]];
+function frac(x){
+  let w = Math.floor(x), r = x - w, best = FR[0], bd = 9;
+  for(const f of FR){ const d = Math.abs(r - f[0]); if(d < bd){ bd = d; best = f; } }
+  if(best[0] === 1){ w += 1; best = FR[0]; }
+  const approx = w + best[0];
+  const txt = (w ? String(w) : "") + (best[1] ? (w ? " " : "") + best[1] : "");
+  return {txt: txt || "0", approx};
+}
+function roundTo(x, step){ return Math.round(x / step) * step; }
+function headTxt(grams){
+  const x = grams / CABBAGE_HEAD_G, opts = [[1/6,"⅙"],[0.25,"¼"],[1/3,"⅓"],[0.5,"½"],[2/3,"⅔"],[0.75,"¾"],[5/6,"⅚"],[1,"1"]];
+  const w = Math.floor(x), r = x - w; let best = ["", ""], bd = 9;
+  for(const o of [[0,""], ...opts]){ const d = Math.abs(r - o[0]); if(d < bd){ bd = d; best = o; } }
+  if(best[1] === "1") return String(w + 1);
+  return (w ? w + (best[1] ? " " : "") : "") + best[1] || "0";
+}
+/* Steps column H: Order numbers of the ingredients a step uses; "total:" prefix shows totals only for that step */
+function parseIngs(str){
+  let s = String(str || "").trim(), total = false;
+  if(/^total:/i.test(s)){ total = true; s = s.replace(/^total:/i, ""); }
+  return {total, orders: s.split(",").map(t => parseInt(t.trim(), 10)).filter(Number.isFinite)};
+}
+function stepAmt(x, n, us, forceTotal, unitName){
+  const scant = /scant/i.test(x.note);
+  const tot = fmtAmount(x.per == null ? null : x.per * n, x.unit, scant);
+  const one = fmtAmount(x.per, x.unit, scant);
+  const each = PER_BOWL.has(x.group) && !forceTotal;
+  const main = x.per == null ? tot.main : (each && n > 1 ? `${one.main} per ${unitName}` : tot.main);
+  const sub = [];
+  if(each && n > 1 && x.per != null) sub.push(`${tot.main} total`);
+  if(x.pantry === "P16" && x.per != null) sub.push(`about ${headTxt(x.per * n)} head`);
+  if(us && tot.us && x.per != null) sub.push(tot.us);
+  return {main, sub: sub.join(" · ")};
+}
+function fmtAmount(qty, unit, scantFlag){
+  if(qty == null || isNaN(qty) || unit === "") return {main:"to taste", us:""};
+  let main, us = "";
+  if(unit === "g"){
+    const v = qty >= 50 ? roundTo(qty, 5) : Math.round(qty);
+    main = v + " g";
+    const oz = qty / 28.35; us = oz >= 16 ? (qty/453.6).toFixed(2).replace(/0$/,"") + " lb" : (oz < 1 ? oz.toFixed(2) : oz.toFixed(1)) + " oz";
+  } else if(unit === "ml"){
+    const v = qty >= 50 ? roundTo(qty, 5) : Math.round(qty);
+    main = v + " ml";
+    const c = frac(qty / 240); us = (c.txt === "0" ? (qty/29.57).toFixed(1) + " fl oz" : c.txt + " cup");
+  } else if(unit === "tsp"){
+    const f = frac(qty); main = f.txt + " tsp"; us = Math.round(qty * 5 * 10) / 10 + " ml";
+  } else if(unit === "Tbsp"){
+    const f = frac(qty); main = f.txt + " Tbsp"; us = Math.round(qty * 15) + " ml";
+  } else if(unit === "egg"){
+    const f = frac(qty); main = f.txt + (qty === 1 ? " egg" : " eggs");
+  } else if(unit === "leaf"){
+    const f = frac(qty); main = f.txt + (qty === 1 ? " leaf" : " leaves");
+  } else { const f = frac(qty); main = f.txt + " " + unit; }
+  if(scantFlag) main = "scant " + main;
+  return {main, us};
+}
+
+/* ---------- connector ---------- */
+function payloadOf(res){ let p = res && res.payload; if(typeof p === "string"){ try{ p = JSON.parse(p); }catch{} } return p; }
+function errText(e){
+  switch(e && e.code){
+    case "needs_reauth": return "Your Google Sheets connection needs renewing. Reconnect Google Sheets in claude.ai Settings, Connectors, then tap Refresh.";
+    case "server_not_connected": return "Google Sheets isn't connected. Add it in claude.ai Settings, Connectors, then tap Refresh.";
+    case "selection_required": return "Choose which Google Sheets connection this page uses when Claude asks, then tap Refresh.";
+    case "not_in_manifest": return "Google Sheets is turned off for this page. Allow it in the page's permissions, then tap Refresh.";
+    case "blocked_by_policy": return "Your organization's settings block this page from Google Sheets.";
+    case "approval_required": return "Reading your sheet needs your approval. Tap Refresh and allow Google Sheets.";
+    case "not_granted": case "capability_disabled": case "capability_removed": return "This view can't reach Google Sheets. Open the page in the Claude app or on claude.ai while signed in.";
+    case "tool_error": return "Google Sheets reported a problem: " + (e.message || "unknown error");
+    case "server_unavailable": return "Google Sheets didn't answer in time. Tap Refresh to try again.";
+    default: return (e && e.message) ? e.message : "Google Sheets couldn't be reached.";
+  }
+}
+async function read(range){
+  const call = () => mcp.callTool(SERVER, "get_values", {spreadsheetId: SHEET_ID, range}, {cache:false});
+  try{ return payloadOf(await call()); }
+  catch(e){
+    if(e && e.retryable){ await new Promise(r => setTimeout(r, (e.retryAfterMs || 800) + Math.random()*600)); return payloadOf(await call()); }
+    throw e;
+  }
+}
+
+function checkHead(name, row){
+  const want = TABS[name].head;
+  for(let i = 0; i < want.length; i++){
+    if(want[i] && String(row[i] || "").trim() !== want[i]) return `${name} column ${String.fromCharCode(65+i)} should be "${want[i]}" but reads "${row[i] || ""}".`;
+  }
+  return null;
+}
+function shape(raw){
+  const rows = n => (raw[n] || []).slice(1).filter(r => r.some(c => String(c).trim() !== ""));
+  const g = (r, i) => (r[i] ?? "").toString().trim();
+  const recipes = rows("Recipes").map(r => ({id:g(r,0), name:g(r,1), ja:g(r,2), version:g(r,3), unit:g(r,4)||"serving", units:g(r,5)||"servings",
+    def:Math.max(1, parseInt(g(r,6)) || 2), style:g(r,7), why:g(r,8), source:g(r,9), equip:g(r,10).split("\n").filter(Boolean), changed:g(r,11), status:g(r,12)})).filter(x => x.id);
+  const ingredients = rows("Ingredients").map(r => ({recipe:g(r,0), order:+g(r,1)||0, group:g(r,2), item:g(r,3), look:g(r,4), per:g(r,5)===""?null:Number(g(r,5)),
+    unit:g(r,6), prep:g(r,7), pantry:g(r,8), why:g(r,9), note:g(r,10)})).sort((a,b)=>a.order-b.order);
+  const steps = rows("Steps").map(r => ({recipe:g(r,0), phase:g(r,1), order:+g(r,2)||0, step:g(r,3), detail:g(r,4), timer:parseFloat(g(r,5))||0, term:g(r,6), ings:g(r,7)}));
+  const pantry = rows("Pantry").map(r => ({n:g(r,0), item:g(r,1), look:g(r,2), bought:g(r,3), where:g(r,4), price:g(r,5), notes:g(r,6), id:g(r,8), section:g(r,9)||"Other", buy:g(r,10)||"stock", keep:g(r,11)})).filter(x => x.id);
+  const glossary = rows("Glossary").map(r => ({term:g(r,0), ja:g(r,1), kind:g(r,2)||"Other", meaning:g(r,3)}));
+  const cooks = rows("Cooks").map((r,i) => ({row:i+2, date:g(r,0), recipeName:g(r,1), n:g(r,2), changed:g(r,3), happened:g(r,4), her:g(r,5), score:g(r,6), next:g(r,7), recipe:g(r,8)}));
+  return {recipes, ingredients, steps, pantry, glossary, cooks};
+}
+async function loadAll(){
+  const names = Object.keys(TABS);
+  const res = await Promise.allSettled(names.map(n => read(TABS[n].range)));
+  const raw = {}, problems = [];
+  res.forEach((r, i) => {
+    const n = names[i];
+    if(r.status === "fulfilled"){
+      const v = (r.value && r.value.values) || [];
+      const bad = checkHead(n, v[0] || []);
+      if(bad) problems.push(bad); else raw[n] = v;
+    } else problems.push(errText(r.reason));
+  });
+  if(Object.keys(raw).length === names.length){
+    D = shape(raw); syncedAt = new Date();
+    store.set("cache", {raw, at: syncedAt.toISOString()});
+    hideBanner();
+  } else {
+    const c = store.get("cache", null);
+    if(c){ D = shape(c.raw); syncedAt = new Date(c.at); }
+    showBanner([...new Set(problems)].join(" ") + (c ? " Showing the copy saved on this device." : ""), "Refresh", refresh);
+  }
+}
+let refreshing = false;
+async function refresh(){
+  if(refreshing || !mcp) return; refreshing = true;
+  try{ await loadAll(); render(); } finally { refreshing = false; }
+}
+
+/* ---------- views ---------- */
+function route(){ const h = location.hash.replace("#",""); return h || "recipes"; }
+function render(){
+  const r = route(), tab = r.startsWith("recipe-") ? "recipes" : r;
+  document.querySelectorAll("nav.tabs a").forEach(a => a.setAttribute("aria-current", a.dataset.tab === tab ? "page" : "false"));
+  if(!D){ $app.innerHTML = `<p class="empty">No data yet. Tap Refresh once Google Sheets is connected.</p>`; return; }
+  if(r.startsWith("recipe-")) return viewRecipe(r.slice(7).toUpperCase());
+  if(r === "shop") return viewShop();
+  if(r === "log") return viewLog();
+  if(r === "learn") return viewLearn();
+  viewRecipes();
+}
+function topbar(title, sub){
+  const t = syncedAt ? syncedAt.toLocaleString(undefined,{month:"short",day:"numeric",hour:"numeric",minute:"2-digit"}) : "not yet";
+  return `<header class="top"><div><h1>${esc(title)}</h1>${sub?`<div class="muted small">${esc(sub)}</div>`:""}</div>
+    <div class="sync"><span data-synced>Synced ${esc(t)}</span><button class="iconbtn" data-refresh>Refresh</button></div></header>`;
+}
+function wireTop(){ const b = $app.querySelector("[data-refresh]"); if(b) b.onclick = refresh; }
+function lastCook(id){ const c = D.cooks.filter(x => x.recipe === id); return c[c.length-1] || null; }
+
+function viewRecipes(){
+  const cards = D.recipes.map(r => {
+    const n = D.cooks.filter(c => c.recipe === r.id).length;
+    return `<button class="rcard" data-recipe="${esc(r.id)}">
+      <span class="name">${esc(r.name)}</span><span class="jp muted">${esc(r.ja)}</span>
+      <span class="row-wrap" style="margin-top:6px"><span class="chip nori">v${esc(r.version)}</span><span class="chip">${esc(r.status)}</span><span class="chip">${n} ${n===1?"cook":"cooks"} logged</span></span></button>`;
+  }).join("");
+  $app.innerHTML = `<div class="view">${topbar("Recipes", "One new dish a month, cooked until it's yours.")}
+    <div style="display:grid;gap:12px">${cards || `<p class="empty">No recipes yet. Add rows to the Recipes tab.</p>`}</div></div>`;
+  wireTop();
+  $app.querySelectorAll("[data-recipe]").forEach(b => b.onclick = () => { location.hash = "recipe-" + b.dataset.recipe.toLowerCase(); });
+}
+
+function viewRecipe(id){
+  const r = D.recipes.find(x => x.id === id); if(!r){ location.hash = "recipes"; return; }
+  const n = store.get("serv:"+id, r.def), us = store.get("us", false);
+  const ings = D.ingredients.filter(x => x.recipe === id);
+  const groups = [...new Set(ings.map(x => x.group))];
+  const lc = lastCook(id);
+  const done = store.get("done:"+id, {});
+  const grpHtml = groups.map(gname => {
+    const each = PER_BOWL.has(gname);
+    const rows = ings.filter(x => x.group === gname).map((x, i) => {
+      const key = `${gname}|${x.item}`;
+      const tot = fmtAmount(x.per == null ? null : x.per * n, x.unit, /scant/i.test(x.note));
+      const one = fmtAmount(x.per, x.unit, /scant/i.test(x.note));
+      const pan = D.pantry.find(p => p.id === x.pantry);
+      return `<div class="ing"><button data-ing="${esc(key)}" aria-expanded="false">
+        <span class="nm">${esc(x.item)}</span>
+        <span class="amt" data-amt="${esc(x.item)}">${each && x.per != null && n > 1 ? `${esc(one.main)} each<small>${esc(tot.main)} total${us&&tot.us?` · ${esc(tot.us)}`:""}</small>` : `${esc(tot.main)}${us&&tot.us?`<small>${esc(tot.us)}</small>`:""}`}</span>
+        ${x.prep ? `<span class="lf">${esc(x.prep)}</span>` : (x.look ? `<span class="lf jp">${esc(x.look)}</span>` : "")}
+      </button><div class="more" hidden>
+        ${x.look ? `<p><span class="k">Look for</span><br><span class="jp">${esc(x.look)}</span></p>` : ""}
+        ${x.why ? `<p><span class="k">Why</span><br>${esc(x.why)}</p>` : ""}
+        ${x.note ? `<p><span class="k">Note</span><br>${esc(x.note)}</p>` : ""}
+        ${pan && pan.keep ? `<p><span class="k">Keep</span><br>${esc(pan.keep)}</p>` : ""}
+      </div></div>`;
+    }).join("");
+    return `<div class="grp"><h3>${esc(gname)}${each ? " · per " + esc(r.unit) : " · for the batch"}</h3>${rows}</div>`;
+  }).join("");
+  const stepIngsHtml = (s, k) => {
+    const {total, orders} = parseIngs(s.ings);
+    const lines = orders.map(o => ings.find(x => x.order === o)).filter(Boolean);
+    if(!lines.length) return "";
+    return `<ul class="st-ings" data-stings="${esc(k)}">${lines.map(x => `<li><span class="nm">${esc(x.item)}</span><span class="amt" data-stamt="${esc(k)}|${x.order}">${(a => esc(a.main) + (a.sub ? `<small>${esc(a.sub)}</small>` : ""))(stepAmt(x, n, us, total, r.unit))}</span></li>`).join("")}</ul>`;
+  };
+  const phase = name => {
+    const st = D.steps.filter(s => s.recipe === id && s.phase === name).sort((a,b) => a.order - b.order);
+    if(!st.length) return "";
+    const items = st.map(s => {
+      const k = `${name}-${s.order}`;
+      return `<li class="${done[k]?"done":""}" data-step="${esc(k)}"><div class="st">
+        <button class="tick" data-tick="${esc(k)}" aria-pressed="${!!done[k]}" aria-label="Mark step ${s.order} done">${done[k]?"✓":s.order}</button>
+        <button class="stxt" data-stxt="${esc(k)}" aria-expanded="false">${esc(s.step)}</button></div>
+        ${stepIngsHtml(s, k)}
+        ${s.timer ? `<button class="timer" data-timer="${s.timer}" data-tk="${esc(k)}">Timer ${fmtClock(s.timer*60)}</button>` : ""}
+        <div class="more st-more" hidden><p>${esc(s.detail)}</p>${s.term ? `<p><a href="#learn" data-term="${esc(s.term)}">${esc(s.term)} in Learn</a></p>` : ""}</div></li>`;
+    }).join("");
+    const label = name === "Cook" ? `Cook · each ${r.unit}` : name;
+    return `<details class="sec" data-sec="${esc(name)}" ${store.get("open:"+id+name, name!=="Finish") ? "open" : ""}><summary><h2>${esc(label)}</h2><span class="cnt">${st.length} ${st.length===1?"step":"steps"}</span></summary>
+      <div class="sec-body"><ol class="steps">${items}</ol></div></details>`;
+  };
+  $app.innerHTML = `<div class="view">
+    <button class="back" data-back>‹ Recipes</button>
+    <div class="hero"><h1>${esc(r.name)}</h1><div class="ja">${esc(r.ja)}</div>
+      <div class="row-wrap" style="margin-top:8px"><span class="chip nori">Version ${esc(r.version)}</span><span class="chip">${esc(r.status)}</span></div></div>
+    <div class="card"><div class="controls">
+      <div class="stepper"><button data-serv="-1" aria-label="Fewer">−</button><output data-servings>${n} ${n===1?esc(r.unit):esc(r.units)}</output><button data-serv="1" aria-label="More">+</button></div>
+      <div class="seg" role="group" aria-label="Units"><button data-us="0" aria-pressed="${!us}">Metric</button><button data-us="1" aria-pressed="${us}">+ US</button></div>
+    </div>${lc && lc.next ? `<div class="note" style="margin-top:12px"><b>Last cook said:</b> ${esc(lc.next)}</div>` : ""}</div>
+    <details class="sec" ${store.get("open:"+id+"Equip", false)?"open":""} data-sec="Equip"><summary><h2>Equipment</h2><span class="cnt">${r.equip.length}</span></summary>
+      <div class="sec-body"><ul class="plain">${r.equip.map(e => `<li>${esc(e)}</li>`).join("")}</ul></div></details>
+    <details class="sec" ${store.get("open:"+id+"Ing", false)?"open":""} data-sec="Ing"><summary><h2>Ingredients</h2><span class="cnt">${ings.length}</span></summary><div class="sec-body"><p class="small muted" style="margin:0 0 6px">Reference list. Each amount also sits under the step that uses it.</p>${grpHtml}</div></details>
+    ${phase("Prep")}${phase("Cook")}${phase("Finish")}
+    <details class="sec" data-sec="Why"><summary><h2>Why it works</h2><span class="cnt"></span></summary><div class="sec-body">
+      <p><b>Style.</b> ${esc(r.style)}</p><p>${esc(r.why)}</p><p><b>This version.</b> ${esc(r.changed)}</p><p class="small muted"><b>Source.</b> ${esc(r.source)}</p></div></details>
+    <button class="btn wide" data-logcook>Log this cook</button>
+    <p class="small muted" style="text-align:center"><button class="iconbtn" data-reset>Clear ticks</button></p>
+  </div>`;
+  $app.querySelector("[data-back]").onclick = () => { location.hash = "recipes"; };
+  $app.querySelectorAll("[data-serv]").forEach(b => b.onclick = () => { store.set("serv:"+id, Math.max(1, Math.min(20, n + (+b.dataset.serv)))); viewRecipe(id); });
+  $app.querySelectorAll("[data-us]").forEach(b => b.onclick = () => { store.set("us", b.dataset.us === "1"); viewRecipe(id); });
+  $app.querySelectorAll("[data-ing],[data-stxt]").forEach(b => b.onclick = () => {
+    const box = b.closest(".ing, li").querySelector(".more"); box.hidden = !box.hidden; b.setAttribute("aria-expanded", String(!box.hidden)); });
+  $app.querySelectorAll("[data-tick]").forEach(b => b.onclick = () => { const d = store.get("done:"+id, {}); d[b.dataset.tick] = !d[b.dataset.tick]; store.set("done:"+id, d); viewRecipe(id); });
+  $app.querySelectorAll("details.sec").forEach(d => d.addEventListener("toggle", () => store.set("open:"+id+d.dataset.sec, d.open)));
+  $app.querySelectorAll("[data-timer]").forEach(b => b.onclick = () => startTimer(b));
+  $app.querySelectorAll("[data-term]").forEach(a => a.onclick = () => store.set("focusTerm", a.dataset.term));
+  $app.querySelector("[data-reset]").onclick = () => { store.set("done:"+id, {}); viewRecipe(id); };
+  $app.querySelector("[data-logcook]").onclick = () => { store.set("logRecipe", id); location.hash = "log"; };
+  restoreTimers();
+}
+
+/* timers: per viewer, survive re-render */
+const timers = {};
+function fmtClock(s){ s = Math.max(0, Math.round(s)); return Math.floor(s/60) + ":" + String(s%60).padStart(2,"0"); }
+function startTimer(b){
+  const k = b.dataset.tk;
+  if(timers[k]){ clearInterval(timers[k].iv); delete timers[k]; b.className = "timer"; b.textContent = "Timer " + fmtClock(+b.dataset.timer*60); return; }
+  timers[k] = {end: Date.now() + (+b.dataset.timer)*60000, iv: null};
+  tick(k); timers[k].iv = setInterval(() => tick(k), 500);
+}
+function tick(k){
+  const t = timers[k]; if(!t) return;
+  const b = $app.querySelector(`[data-tk="${CSS.escape(k)}"]`);
+  const left = (t.end - Date.now())/1000;
+  if(left <= 0){ clearInterval(t.iv); t.done = true; if(b){ b.className = "timer end"; b.textContent = "Time's up · tap to reset"; } if(!t.beeped){ t.beeped = true; beep(); } return; }
+  if(b){ b.className = "timer run"; b.textContent = fmtClock(left) + " left · tap to stop"; }
+}
+function restoreTimers(){ Object.keys(timers).forEach(k => { if(timers[k].done){ const b = $app.querySelector(`[data-tk="${CSS.escape(k)}"]`); if(b){ b.className="timer end"; b.textContent="Time's up · tap to reset"; } } else tick(k); }); }
+function beep(){ try{ const c = new (window.AudioContext||window.webkitAudioContext)(); [0,0.35,0.7].forEach(t => { const o = c.createOscillator(), g = c.createGain(); o.frequency.value = 880; g.gain.value = 0.15; o.connect(g); g.connect(c.destination); o.start(c.currentTime+t); o.stop(c.currentTime+t+0.2); }); }catch{} if(navigator.vibrate) try{ navigator.vibrate([200,100,200]); }catch{} }
+
+function viewShop(){
+  const plan = store.get("plan", null) || Object.fromEntries(D.recipes.map(r => [r.id, r.def]));
+  const got = store.get("got", {});
+  const need = {};
+  D.recipes.forEach(r => {
+    const n = plan[r.id] || 0; if(!n) return;
+    D.ingredients.filter(x => x.recipe === r.id).forEach(x => {
+      const p = D.pantry.find(q => q.id === x.pantry); if(!p) return;
+      const e = need[p.id] || (need[p.id] = {p, qty:{}, recipes:new Set()});
+      e.recipes.add(r.name);
+      if(x.per != null && x.unit){ e.qty[x.unit] = (e.qty[x.unit] || 0) + x.per * n; }
+    });
+  });
+  const secs = [...new Set([...SECTION_ORDER, ...Object.values(need).map(e => e.p.section)])];
+  const list = secs.map(s => {
+    const items = Object.values(need).filter(e => e.p.section === s).sort((a,b) => (+a.p.n||99) - (+b.p.n||99));
+    if(!items.length) return "";
+    return `<div class="card sh-sec" data-section="${esc(s)}"><h3 style="margin-bottom:6px">${esc(s)}</h3>${items.map(e => {
+      const p = e.p, isAmt = p.buy === "amount";
+      let amt = "have it?";
+      if(isAmt){
+        amt = Object.entries(e.qty).map(([u,q]) => fmtAmount(q,u).main).join(" + ");
+        if(p.id === "P16" && e.qty.g) amt += ` · about ${frac(e.qty.g / CABBAGE_HEAD_G).txt} head`;
+      }
+      return `<label class="item ${got[p.id]?"got":""}" data-item="${esc(p.id)}"><input type="checkbox" data-got="${esc(p.id)}" ${got[p.id]?"checked":""}>
+        <span><span class="iname">${esc(p.item)}</span> ${p.look?`<span class="jp small muted">${esc(p.look)}</span>`:""}
+        <div class="where">${esc(p.where)}${p.bought?` · last time: ${esc(p.bought)}`:""}</div>${p.notes?`<div class="where">${esc(p.notes)}</div>`:""}</span>
+        <span class="amt" data-need="${esc(p.id)}">${esc(amt)}${p.price?`<small>${esc(p.price)}</small>`:""}</span></label>`;
+    }).join("")}</div>`;
+  }).join("");
+  const rq = D.recipes.map(r => `<div class="rq"><span>${esc(r.name)}</span><div class="stepper">
+      <button data-plan="${esc(r.id)}" data-d="-1" aria-label="Fewer ${esc(r.units)}">−</button><output data-plan-out="${esc(r.id)}">${plan[r.id]||0} ${esc((plan[r.id]||0)===1?r.unit:r.units)}</output><button data-plan="${esc(r.id)}" data-d="1" aria-label="More ${esc(r.units)}">+</button></div></div>`).join("");
+  $app.innerHTML = `<div class="view">${topbar("Shopping list", "Pick recipes and amounts; the list builds itself.")}
+    <div class="card">${rq}</div>
+    ${list || `<p class="empty">Add a recipe above to build the list.</p>`}
+    ${list ? `<div class="card"><button class="btn wide" data-send-grocery ${sending?"disabled":""}>${sending?"Sending…":"Send unchecked items to the grocery list"}</button><p class="small muted" style="margin:8px 0 0">Adds what isn't ticked here to the shared Groceries list (the one Courtney sees). Items already on it are skipped.</p><div class="small" data-send-result></div></div>` : ""}
+    ${list ? `<p style="text-align:center"><button class="iconbtn" data-clear>Uncheck everything</button></p>` : ""}</div>`;
+  wireTop();
+  const sg = $app.querySelector("[data-send-grocery]"); if(sg) sg.onclick = () => sendToGrocery(need, store.get("got", {}));  // read ticks fresh: the render-time copy goes stale
+  $app.querySelectorAll("[data-plan]").forEach(b => b.onclick = () => { const p = {...plan}; p[b.dataset.plan] = Math.max(0, Math.min(20, (p[b.dataset.plan]||0) + (+b.dataset.d))); store.set("plan", p); viewShop(); });
+  $app.querySelectorAll("[data-got]").forEach(c => c.onchange = () => { const g = store.get("got", {}); g[c.dataset.got] = c.checked; store.set("got", g); c.closest(".item").classList.toggle("got", c.checked); });
+  const cl = $app.querySelector("[data-clear]"); if(cl) cl.onclick = () => { store.set("got", {}); viewShop(); };
+}
+
+/* Push to the shared grocery list (CS-066): one read to skip duplicates, one append, one read-back. Single-flight. */
+let sending = false;
+async function sendToGrocery(need, got){
+  if(sending) return; sending = true; viewShop();
+  const out = $app.querySelector("[data-send-result]");
+  try{
+    const cur = payloadOf(await mcp.callTool(SERVER, "get_values", {spreadsheetId: GROCERY_ID, range:"List!A1:L"}, {cache:false}));
+    const rows = (cur && cur.values) || [];
+    const head = rows[0] || [];
+    for(let i = 0; i < GROCERY_HEAD.length; i++) if(String(head[i] || "").trim() !== GROCERY_HEAD[i]) throw {code:"tool_error", message:`Grocery list column ${String.fromCharCode(65+i)} should be "${GROCERY_HEAD[i]}" but reads "${head[i] || ""}". Nothing was sent.`};
+    const onList = new Set(rows.slice(1).filter(r => r[0] && !(r[8]||"") && !(r[11]||"")).map(r => String(r[1]||"").trim().toLowerCase()));
+    const now = new Date().toISOString();
+    const items = Object.values(need).filter(e => !got[e.p.id]);
+    const skipped = [], send = [];
+    items.forEach((e, i) => {
+      const p = e.p;
+      if(onList.has(p.item.trim().toLowerCase())){ skipped.push(p.item); return; }
+      const isAmt = p.buy === "amount";
+      let qty = isAmt ? Object.entries(e.qty).map(([u,q]) => fmtAmount(q,u).main).join(" + ") : "";
+      if(isAmt && p.id === "P16" && e.qty.g) qty += ` (about ${frac(e.qty.g / CABBAGE_HEAD_G).txt} head)`;
+      const store_ = /any grocery/i.test(p.where) ? "" : "Nijiya";
+      const note = [isAmt ? "" : "stock item: check what's left", p.look, p.where, "for " + [...e.recipes].join(", ")].filter(Boolean).join(" · ");
+      send.push(["T" + Date.now().toString(36) + i.toString(36), p.item, qty, p.section, store_, note, "Teppan Notebook", now, "", "", "", ""].map(x => safeCell(String(x))));
+    });
+    if(!send.length){ if(out) out.textContent = skipped.length ? `Nothing to send: all ${skipped.length} already on the list.` : "Nothing to send."; return; }
+    await mcp.callTool(SERVER, "append_values", {spreadsheetId: GROCERY_ID, range:"List!A1:L", values: send}, {cache:false});
+    const after = payloadOf(await mcp.callTool(SERVER, "get_values", {spreadsheetId: GROCERY_ID, range:"List!A1:L"}, {cache:false}));
+    const ids = new Set(((after && after.values) || []).map(r => r[0]));
+    const landed = send.filter(r => ids.has(r[0])).length;
+    const msg = landed === send.length ? `Sent ${landed} item${landed===1?"":"s"} to the grocery list.` : `Sent ${send.length}, but only ${landed} came back on read-back. Check the Groceries list.`;
+    if(out) out.textContent = msg + (skipped.length ? ` Skipped ${skipped.length} already there.` : "");
+    toast(msg);
+  }catch(e){
+    if(out) out.textContent = errText(e);
+    toast("Couldn't send: " + errText(e));
+  } finally { sending = false; const b = $app.querySelector("[data-send-grocery]"); if(b){ b.disabled = false; b.textContent = "Send unchecked items to the grocery list"; } }
+}
+
+function todayISO(){ const d = new Date(), p = n => String(n).padStart(2,"0"); return `${d.getFullYear()}-${p(d.getMonth()+1)}-${p(d.getDate())}`; }
+function viewLog(){
+  const pick = store.get("logRecipe", D.recipes[0] && D.recipes[0].id);
+  const draft = store.get("draft", {});
+  const r = D.recipes.find(x => x.id === pick) || D.recipes[0];
+  const prior = D.cooks.filter(c => r && c.recipe === r.id).reduce((m, c) => Math.max(m, parseInt(String(c.n), 10) || 0), 0); // ISS-071: highest cook number, not row count
+  const list = [...D.cooks].reverse().map(c => {
+    const rr = D.recipes.find(x => x.id === c.recipe);
+    return `<div class="cook" data-cookrow="${c.row}"><div class="row-wrap"><b>${esc(rr ? rr.name : c.recipeName)}</b><span class="chip">cook ${esc(c.n)}</span><span class="muted small">${esc(c.date)}</span>${c.score?`<span class="chip nori">${esc(c.score)}/5</span>`:""}</div>
+      <dl>${c.changed?`<dt>Changed</dt><dd>${esc(c.changed)}</dd>`:""}${c.happened?`<dt>Happened</dt><dd>${esc(c.happened)}</dd>`:""}${c.her?`<dt>Her</dt><dd>${esc(c.her)}</dd>`:""}${c.next?`<dt>Next time</dt><dd>${esc(c.next)}</dd>`:""}</dl></div>`;
+  }).join("");
+  $app.innerHTML = `<div class="view">${topbar("Cook log", "What changed, what happened, how she liked it.")}
+    <form class="card" id="logform" novalidate>
+      <h2>Log a cook</h2>
+      <label class="f" for="lg-recipe">Recipe</label><select id="lg-recipe">${D.recipes.map(x => `<option value="${esc(x.id)}" ${r&&x.id===r.id?"selected":""}>${esc(x.name)} (v${esc(x.version)})</option>`).join("")}</select>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+        <div><label class="f" for="lg-date">Date</label><input id="lg-date" type="date" value="${esc(draft.date||todayISO())}"></div>
+        <div><label class="f" for="lg-n">Cook #</label><input id="lg-n" type="text" value="${esc(draft.n||String(prior+1))}"></div></div>
+      <label class="f" for="lg-changed">What I changed from last time</label><textarea id="lg-changed">${esc(draft.changed||"")}</textarea>
+      <label class="f" for="lg-happened">What happened (taste, texture, timing)</label><textarea id="lg-happened">${esc(draft.happened||"")}</textarea>
+      <label class="f" for="lg-her">Her reaction</label><textarea id="lg-her">${esc(draft.her||"")}</textarea>
+      <label class="f">My score</label><div class="scores" id="lg-score">${[1,2,3,4,5].map(s => `<button type="button" data-score="${s}" aria-pressed="${String(draft.score)===String(s)}">${s}</button>`).join("")}</div>
+      <label class="f" for="lg-next">Next time try</label><textarea id="lg-next">${esc(draft.next||"")}</textarea>
+      <div style="margin-top:14px"><button class="btn wide" id="lg-save" type="submit">Save to the log</button></div>
+    </form>
+    <div class="card"><h2 style="margin-bottom:4px">Past cooks</h2>${list || `<p class="empty">No cooks logged yet.</p>`}</div></div>`;
+  wireTop();
+  const f = $app.querySelector("#logform");
+  const val = () => ({recipe:f.querySelector("#lg-recipe").value, date:f.querySelector("#lg-date").value, n:f.querySelector("#lg-n").value.trim(),
+    changed:f.querySelector("#lg-changed").value.trim(), happened:f.querySelector("#lg-happened").value.trim(), her:f.querySelector("#lg-her").value.trim(),
+    score:(f.querySelector('[data-score][aria-pressed="true"]')||{}).dataset?.score||"", next:f.querySelector("#lg-next").value.trim()});
+  f.addEventListener("input", () => store.set("draft", val()));
+  f.querySelector("#lg-recipe").onchange = e => { store.set("logRecipe", e.target.value); store.set("draft", {...val(), n:""}); viewLog(); };
+  f.querySelectorAll("[data-score]").forEach(b => b.onclick = () => { f.querySelectorAll("[data-score]").forEach(x => x.setAttribute("aria-pressed", String(x===b && x.getAttribute("aria-pressed")!=="true"))); store.set("draft", val()); });
+  f.onsubmit = e => { e.preventDefault(); saveCook(val()); };
+}
+const safeCell = s => /^[=+\-@]/.test(s) ? "'" + s : s;
+async function saveCook(v){
+  if(saving) return;
+  if(!v.happened && !v.changed && !v.her && !v.next){ toast("Write at least what happened before saving."); return; }
+  const r = D.recipes.find(x => x.id === v.recipe);
+  const row = [v.date || todayISO(), r ? `${r.name} v${r.version}` : v.recipe, v.n, v.changed, v.happened, v.her, v.score, v.next, v.recipe].map(x => safeCell(String(x)));
+  saving = true; const btn = $app.querySelector("#lg-save"); if(btn){ btn.disabled = true; btn.textContent = "Saving…"; }
+  try{
+    const res = await mcp.callTool(SERVER, "append_values", {spreadsheetId: SHEET_ID, range:"Cooks!A:I", values:[row]}, {cache:false});
+    const p = payloadOf(res);
+    const after = await read(TABS.Cooks.range);
+    const rows = (after && after.values) || [];
+    const ok = rows.some(x => x[0]===row[0] && x[4]===row[4] && x[8]===row[8]);
+    store.set("draft", {});
+    await loadAll(); viewLog();
+    toast(ok ? "Saved to your cook log." : "Saved, but the read-back didn't find the row. Check the Cooks tab.");
+  }catch(e){
+    if(btn){ btn.disabled = false; btn.textContent = "Save to the log"; }
+    showBanner(errText(e) + " Your entry is kept on this device as a draft. If Google Sheets timed out, check the Cooks tab before saving again.");
+  } finally { saving = false; }
+}
+
+function viewLearn(){
+  const focus = store.get("focusTerm", ""); store.set("focusTerm", "");
+  const kinds = [...new Set(D.glossary.map(g => g.kind))];
+  const gl = kinds.map(k => `<div class="card"><h3 style="margin-bottom:6px">${esc(k)}</h3>${D.glossary.filter(g => g.kind===k).map(g =>
+    `<div class="gl" id="t-${esc(g.term.replace(/[^a-z0-9]+/gi,"-").toLowerCase())}" data-gl="${esc(g.term)}"><b>${esc(g.term)}</b> ${g.ja?`<span class="jp muted">${esc(g.ja)}</span>`:""}<div>${esc(g.meaning)}</div></div>`).join("")}</div>`).join("");
+  const conv = [["1 tsp (小さじ)","5 ml"],["1 Tbsp (大さじ)","15 ml = 3 tsp"],["1 Japanese cup","200 ml"],["1 US cup","about 240 ml"],["1 oz","28.35 g"],["100 g","about 3.5 oz"],["1 lb","454 g"],["1 inch","2.54 cm"],["1 cm","about 3/8 inch"],["2 to 3 mm","about 1/8 inch"]];
+  $app.innerHTML = `<div class="view">${topbar("Learn", "Cuts, techniques and measures used in your recipes.")}
+    <div class="card"><h3 style="margin-bottom:6px">Conversions</h3><table class="conv">${conv.map(c => `<tr><td>${esc(c[0])}</td><td>${esc(c[1])}</td></tr>`).join("")}</table></div>
+    ${gl}<p class="small muted">Ingredient notes (what each one is and why it's there) open when you tap an ingredient in a recipe.</p></div>`;
+  wireTop();
+  if(focus){ const el = document.getElementById("t-" + focus.replace(/[^a-z0-9]+/gi,"-").toLowerCase()); if(el){ el.scrollIntoView({block:"center"}); el.style.background = "var(--nori-soft)"; } }
+}
+
+/* ---------- chrome ---------- */
+let toastT;
+function toast(msg){ const t = document.getElementById("toast"); t.textContent = msg; t.hidden = false; clearTimeout(toastT); toastT = setTimeout(() => t.hidden = true, 3200); }
+function showBanner(msg, action, fn){ const b = document.getElementById("banner"); b.innerHTML = `<div>${esc(msg)}</div>${action?`<button class="btn" data-banner>${esc(action)}</button>`:""}`; b.hidden = false; if(action) b.querySelector("[data-banner]").onclick = fn; }
+function hideBanner(){ document.getElementById("banner").hidden = true; }
+
+window.addEventListener("hashchange", () => { render(); window.scrollTo(0,0); });
+document.addEventListener("visibilitychange", () => { if(document.visibilityState === "visible" && syncedAt && Date.now() - syncedAt > 60000) refresh(); });
+
+(async function start(){
+  const c = store.get("cache", null);
+  if(c){ D = shape(c.raw); syncedAt = new Date(c.at); render(); }
+  mcp = (window.claude && window.claude.use) ? await window.claude.use("mcp") : null;
+  if(!mcp){
+    if(!D) $app.innerHTML = `<header class="top"><h1>Teppan Notebook</h1></header><p>Open this page in the Claude app or on claude.ai while signed in. It reads your recipes and saves your cook log through your Google Sheets connection.</p>`;
+    else showBanner("Offline: showing the copy saved on this device. Logging a cook needs Google Sheets.");
+    return;
+  }
+  await loadAll(); render();
+})();
+</script>
+</body></html>
