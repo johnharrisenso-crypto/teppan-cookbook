@@ -38,7 +38,7 @@ const call = p => JSON.parse(ctx.doPost({postData: {contents: JSON.stringify(p)}
 let n = 0; const ok = (c, m) => { assert.ok(c, m); n++; };
 
 ok(!/\bKEY\b|p\.key|H4Dc/.test(fs.readFileSync(process.argv[2] || __dirname + "/Code.gs", "utf8")), "no access key in the code");
-ok(call({action: "ping"}).version === 2, "ping v2");
+ok(call({action: "ping"}).version === 3, "ping v3");
 let r = call({action: "add", by: "John", items: [{item: "Eggs", qty: "12", section: "Refrigerated and pickles", tmp: "t1"}, {item: "Cabbage", section: "Produce"}, {item: "=SUM(1)"}]});
 ok(r.ok && r.added.length === 3, "add 3: " + JSON.stringify(r));
 ok(r.map.t1 === "G0001", "tmp id mapped");
@@ -72,6 +72,20 @@ ok(r.ok && r.row === 2, "log appended with read-back: " + JSON.stringify(r));
 ok(call({action: "log", row: ["a"]}).ok === false, "log row length checked");
 r = call({action: "log", row: ["2026-11-12","Okonomiyaki v2","5","","'- crisp edges","","","","OKO"]});
 ok(r.ok, "log entry starting with a hyphen reads back as saved: " + JSON.stringify(r));
+// --- move and learn (version 3) ---
+ok(Array.isArray(call({action: "state"}).learned) && call({action: "state"}).learned.length === 0, "no Learned tab: state still works, learned is empty");
+r = call({action: "move", id: "G0004", section: "Produce"});
+ok(r.ok && r.row.Section === "Produce", "move works without a Learned tab: " + JSON.stringify(r));
+grocery.Learned = mkSheet("Learned", [["Item","Section","Store","Updated"]]);
+r = call({action: "move", id: "G0004", section: "Meat", store: "Nijiya"});
+ok(r.ok && r.row.Section === "Meat & seafood" && r.row.Store === "Nijiya", "move maps a Pantry alias and sets the store: " + JSON.stringify(r.row));
+let lr = call({action: "state"}).learned;
+ok(lr.length === 1 && lr[0].Item === "Rice" && lr[0].Section === "Meat & seafood" && lr[0].Store === "Nijiya", "move is remembered in Learned: " + JSON.stringify(lr));
+r = call({action: "move", id: "G0004", store: "Andronico's"});
+lr = call({action: "state"}).learned;
+ok(r.row.Section === "Meat & seafood" && r.row.Store === "Andronico's" && lr.length === 1 && lr[0].Section === "Meat & seafood" && lr[0].Store === "Andronico's", "store-only move keeps the section and updates the same Learned row");
+ok(call({action: "move", id: "G9999", section: "Produce"}).ok === false, "move of a missing row is refused");
+ok(call({action: "move", id: "G0004"}).ok === false, "move with nothing to change is refused");
 grocery.List._data()[0][3] = "Aisle";
 ok(/column D should be "Section"/.test(call({action: "state"}).error), "header moved is reported");
 console.log("PASS " + n + " checks");

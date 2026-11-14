@@ -29,7 +29,7 @@ sub('<meta name="claude:viewport-fit-sides" content="cover">',
     '<meta name="apple-mobile-web-app-title" content="Cookbook">\n<meta name="apple-mobile-web-app-status-bar-style" content="default">\n'
     '<meta name="theme-color" content="#EEF0EC">\n<link rel="icon" type="image/png" href="apple-touch-icon.png">')
 sub("/* Version 3 (CS-066, 2026-11-05):",
-    "/* Teppan Cookbook version 0.7.4 (CS-066, 2026-11-13: word list wins over the Pantry's coarse sections; lunch meat to Deli). 0.7.3 (2026-11-13: Andronico's is the default store; List filter by store). 0.7.2 (2026-11-13: sections guessed for everyday items, no section picker). 0.7.1 (2026-11-12: a list read in flight no longer hides a just-added item; Loading text; favicon). 0.7 (2026-11-11): standalone app on Netlify; data through the Apps Script endpoint (no Claude or Google sign-in); new List tab, the shared grocery list. Built from Teppan Notebook version 3 by build.py. */\n/* Notebook version 3 (CS-066, 2026-11-05):")
+    "/* Teppan Cookbook version 0.7.5 (CS-066, 2026-11-14: move an item's section or store from its detail; moves are learned, endpoint v3). 0.7.4 (2026-11-13: word list wins over the Pantry's coarse sections; lunch meat to Deli). 0.7.3 (2026-11-13: Andronico's is the default store; List filter by store). 0.7.2 (2026-11-13: sections guessed for everyday items, no section picker). 0.7.1 (2026-11-12: a list read in flight no longer hides a just-added item; Loading text; favicon). 0.7 (2026-11-11): standalone app on Netlify; data through the Apps Script endpoint (no Claude or Google sign-in); new List tab, the shared grocery list. Built from Teppan Notebook version 3 by build.py. */\n/* Notebook version 3 (CS-066, 2026-11-05):")
 
 # --- five tabs ---
 sub("grid-template-columns:repeat(4,1fr)", "grid-template-columns:repeat(5,1fr)")
@@ -52,7 +52,7 @@ sub_re(r'async function loadAll\(\)\{.*?\n\}\nlet refreshing = false;',
     const problems = Object.keys(TABS).map(n => checkHead(n, (s.raw[n] || [])[0] || [])).filter(Boolean);
     if(problems.length) throw {message: problems.join(" ")};
     D = shape(s.raw); syncedAt = new Date(); store.set("cache", {raw: s.raw, at: syncedAt.toISOString()});
-    if(gen === listGen && !pending() && !flushing){ L = {list: s.list, usual: s.usual, sections: s.sections}; listAt = new Date(); cacheList(); }
+    if(gen === listGen && !pending() && !flushing){ L = {list: s.list, usual: s.usual, sections: s.sections, learned: s.learned || []}; listAt = new Date(); cacheList(); }
     hideBanner();
   }catch(e){
     const c = store.get("cache", null);
@@ -88,7 +88,7 @@ function sendToGrocery(need, got){
       if(isAmt && p.id === "P16" && e.qty.g) qty += ` (about ${frac(e.qty.g / CABBAGE_HEAD_G).txt} head)`;
       const store_ = /any grocery/i.test(p.where) ? DEFAULT_STORE : "Nijiya";   // Pantry 'Any grocery' means the everyday store
       const note = [isAmt ? "" : "stock item: check what's left", p.look, p.where, "for " + [...e.recipes].join(", ")].filter(Boolean).join(" · ");
-      send.push({item:p.item, qty, section: guessByWords(p.item) || p.section, store:store_, note, tmp: tmpId()});
+      send.push({item:p.item, qty, section: (learnedFor(p.item) || {}).Section || guessByWords(p.item) || p.section, store:store_, note, tmp: tmpId()});
     });
     const out = $app.querySelector("[data-send-result]");
     if(!send.length){ const m = skipped.length ? `Nothing to send: all ${skipped.length} already on the List.` : "Nothing to send."; if(out) out.textContent = m; toast(m); return; }

@@ -14,6 +14,7 @@ LIST_HEAD = ["ID","Item","Qty","Section","Store","Note","Added by","Added","Done
 class Mock:
     def __init__(s):
         s.list, s.usual, s.cooks, s.calls, s.offline = [], [], copy.deepcopy(RAW["Cooks"]), [], False
+        s.learned = []
     def sec(s, n):
         n = (n or "").strip()
         for x in SECTIONS:
@@ -24,7 +25,7 @@ class Mock:
         s.calls.append(p)
         a = p.get("action", "state")
         if a == "state":
-            o = {"ok": True, "list": [r for r in s.list if not r["Cleared"]], "usual": s.usual, "sections": SECTIONS}
+            o = {"ok": True, "list": [r for r in s.list if not r["Cleared"]], "usual": s.usual, "sections": SECTIONS, "learned": s.learned}
             if p.get("recipes"):
                 raw = copy.deepcopy(RAW); raw["Cooks"] = s.cooks; o["raw"] = raw
             return o
@@ -57,6 +58,16 @@ class Mock:
             s.usual = [u for u in s.usual if u["Item"].lower() != p["item"].lower()]
             if p.get("star"): s.usual.append({"ID": "U%03d" % (len(s.usual) + 1), "Item": p["item"], "Qty": p.get("qty", ""), "Section": s.sec(p.get("section")), "Store": p.get("store", "")})
             return {"ok": True, "usual": s.usual}
+        if a == "move":
+            r = next((x for x in s.list if x["ID"] == p.get("id")), None)
+            if not r: return {"ok": False, "error": "No row"}
+            if p.get("section"): r["Section"] = s.sec(p["section"])
+            if p.get("store"): r["Store"] = p["store"]
+            k = next((l for l in s.learned if l["Item"].lower() == r["Item"].lower()), None)
+            if not k: k = {"Item": r["Item"], "Section": "", "Store": ""}; s.learned.append(k)
+            if p.get("section"): k["Section"] = r["Section"]
+            if p.get("store"): k["Store"] = r["Store"]
+            return {"ok": True, "row": r}
         if a == "log":
             row = p.get("row") or []
             if len(row) != 9: return {"ok": False, "error": "A cook row needs 9 values"}
@@ -216,6 +227,24 @@ with sync_playwright() as p:
     try: a.click("[data-lstore='All']", timeout=T); settle(a)
     except Exception: pass
     check("All shows both stores again", lambda: "Pork belly, thin-sliced" in a.inner_text("#app") and "Eggs" in a.inner_text("#app"))
+    # --- move an item's section or store from its detail, and learn it (owner, 2026-11-13) ---
+    oid = None
+    try:
+        add(a, "Oat milk"); settle(a); oid = item_id(a, "Oat milk")
+        a.click(f"[data-lopen='{oid}']", timeout=T); a.select_option(f"[data-lmove-sec='{oid}']", "Drinks"); settle(a)
+    except Exception: pass
+    check("moving a section writes it to the right row", lambda: next(r for r in M.list if r["Item"] == "Oat milk")["Section"] == "Drinks" and any(c.get("action") == "move" and c.get("id") == oid for c in M.calls))
+    check("the moved item shows under its new section", lambda: a.locator(f"[data-lsec='Drinks'] [data-li='{oid}']").count() == 1)
+    try:
+        if not a.locator(f"[data-lmove-store][data-for='{oid}']").count(): a.click(f"[data-lopen='{oid}']", timeout=T)
+        a.click(f"[data-lmove-store='Nijiya'][data-for='{oid}']", timeout=T); settle(a)
+    except Exception: pass
+    check("moving a store writes it to the right row", lambda: next(r for r in M.list if r["Item"] == "Oat milk")["Store"] == "Nijiya")
+    try:
+        a.check(f"[data-ltick='{oid}']", timeout=T); settle(a); a.click("[data-lclear]", timeout=T); settle(a)
+        add(a, "oat milk"); settle(a)
+    except Exception: pass
+    check("a moved item is learned: added again it goes to the same section and store", lambda: any(r["Item"] == "oat milk" and not r["Cleared"] and r["Section"] == "Drinks" and r["Store"] == "Nijiya" for r in M.list))
     # --- log: cook number and save ---
     try: a.click("a[data-tab=log]", timeout=T); a.wait_for_selector("#lg-n", timeout=T)
     except Exception: pass

@@ -48,6 +48,12 @@ function applyLocal(op){
     L.list = L.list.filter(y => y.ID !== op.id);
   } else if(op.op === "clear"){
     L.list = L.list.filter(y => !y.Done);
+  } else if(op.op === "move"){
+    const x = L.list.find(y => y.ID === op.id);
+    if(x){ if(op.section) x.Section = op.section; if(op.store) x.Store = op.store; }
+    if(x){ L.learned = L.learned || []; const k = L.learned.find(l => norm(l.Item) === norm(x.Item));
+      if(k){ if(op.section) k.Section = op.section; if(op.store) k.Store = op.store; }
+      else L.learned.push({Item: x.Item, Section: op.section || "", Store: op.store || ""}); }
   } else if(op.op === "usual"){
     const i = L.usual.findIndex(u => norm(u.Item) === norm(op.item));
     if(op.star){ const u = {ID: i >= 0 ? L.usual[i].ID : op.tmp, Item: op.item, Qty: op.qty || "", Section: sectionFor(op.section), Store: op.store || ""}; if(i >= 0) L.usual[i] = u; else L.usual.push(u); }
@@ -82,6 +88,7 @@ async function flush(){
         else if(op.op === "tick") res = await api({action:"tick", id: op.id, done: op.done, by: op.by});
         else if(op.op === "remove") res = await api({action:"remove", id: op.id});
         else if(op.op === "clear") res = await api({action:"clear"});
+        else if(op.op === "move") res = await api({action:"move", id: op.id, section: op.section, store: op.store});
         else if(op.op === "usual") res = await api({action:"usual", item: op.item, qty: op.qty, section: op.section, store: op.store, star: op.star});
       }catch(e){
         if(e && e.offline) break;                        // keep it; try again when the signal is back
@@ -108,7 +115,7 @@ async function refreshList(quiet){
   try{
     const s = await api({action:"state"}, 20000);
     if(gen !== listGen || pending() || flushing) return;   // a change happened while this read was in flight
-    L = {list: s.list, usual: s.usual, sections: s.sections}; listAt = new Date(); cacheList();
+    L = {list: s.list, usual: s.usual, sections: s.sections, learned: s.learned || []}; listAt = new Date(); cacheList();
     if(route() === "list") viewList();
   }catch(e){ if(!quiet) toast(errText(e)); updateListStatus(); }
 }
@@ -148,8 +155,10 @@ function guessByWords(name){
   for (let i = raw.length - 1; i >= 0; i--) { const hit = look(raw[i]) || look(one[i]) || look(bare[i]); if (hit) return hit; }
   return "";
 }
+function learnedFor(name){ const n = norm(name); return (L && L.learned || []).find(l => norm(l.Item) === n) || null; }
 function guessSection(name){
   const n = norm(name); if(!n) return "";
+  const k = learnedFor(name); if(k && k.Section) return k.Section;        // a move taught it (shared, kept after Clear)
   const hit = (L ? [...L.list, ...L.usual] : []).find(x => norm(x.Item) === n && x.Section);
   if(hit) return hit.Section;
   const w = guessByWords(name);                 // the word list is finer than the Pantry's six sections (eggs: Dairy & eggs, not Refrigerated)
@@ -191,6 +200,9 @@ function viewList(){
         ${isOpen ? `<div class="more" style="grid-column:2 / -1;margin-top:6px" data-ldetail="${esc(x.ID)}">
           ${x.Note?`<p>${esc(x.Note)}</p>`:""}
           <p class="small muted">Added by ${esc(x["Added by"] || "someone")}${x.Added?` · ${esc(when(x.Added))}`:""}${x.Done?` · got by ${esc(x["Done by"] || "someone")}`:""}</p>
+          <div class="row-wrap" style="margin:0 0 10px"><label class="small muted" for="mv-${esc(x.ID)}">Section</label>
+            <select id="mv-${esc(x.ID)}" data-lmove-sec="${esc(x.ID)}" style="width:auto;flex:1">${[...secs, ...(known.has(x.Section) ? [] : [x.Section || "Other"])].map(sc => `<option ${sc === (x.Section || "Other") ? "selected" : ""}>${esc(sc)}</option>`).join("")}</select></div>
+          <div class="row-wrap" style="margin:0 0 10px"><span class="small muted">Store</span>${stores.map(st => `<button class="chip ${st === storeOf(x) ? "nori" : ""}" data-lmove-store="${esc(st)}" data-for="${esc(x.ID)}" aria-pressed="${st === storeOf(x)}">${esc(st)}</button>`).join("")}</div>
           <div class="row-wrap"><button class="iconbtn" data-lstar="${esc(x.ID)}">${isUsual(x.Item) ? "★ In usuals" : "☆ Add to usuals"}</button><button class="iconbtn" data-lremove="${esc(x.ID)}">Remove</button></div></div>` : ""}
       </div>`;
     }).join("")}</div>`;
@@ -221,10 +233,18 @@ function viewList(){
     const name = inp.value.trim(); if(!name) return;   // guard the handler as well as the button
     if(openOnList(name)){ toast(`${name} is already on the list.`); return; }
     const sec = guessSection(name);
-    enqueue({op:"add", items:[{item:name, qty:f.querySelector("#add-qty").value.trim(), section:sec, store: filt === "All" ? DEFAULT_STORE : filt, note:"", tmp: tmpId()}]});
+    enqueue({op:"add", items:[{item:name, qty:f.querySelector("#add-qty").value.trim(), section:sec, store: filt !== "All" ? filt : ((learnedFor(name) || {}).Store || DEFAULT_STORE), note:"", tmp: tmpId()}]});
     store.set("addDraft", ""); viewList();
     const again = $app.querySelector("#add-item"); if(again) again.focus();
   };
+  $app.querySelectorAll("[data-lmove-sec]").forEach(sel => sel.onchange = () => {
+    const x = L.list.find(y => y.ID === sel.dataset.lmoveSec); if(!x || sel.value === x.Section || sel.value === "Other") return;
+    enqueue({op:"move", id:x.ID, section: sel.value}); toast(`${x.Item} moved to ${sel.value}. It will go there next time too.`); viewList();
+  });
+  $app.querySelectorAll("[data-lmove-store]").forEach(b => b.onclick = () => {
+    const x = L.list.find(y => y.ID === b.dataset.for); if(!x || storeOf(x) === b.dataset.lmoveStore) return;
+    enqueue({op:"move", id:x.ID, store: b.dataset.lmoveStore}); toast(`${x.Item} moved to ${b.dataset.lmoveStore}. It will go there next time too.`); viewList();
+  });
   $app.querySelectorAll("[data-lstore]").forEach(b => b.onclick = () => { store.set("storeFilter", b.dataset.lstore); storeFilterMem = b.dataset.lstore; viewList(); });
   $app.querySelectorAll("[data-ltick]").forEach(c => c.onchange = () => { enqueue({op:"tick", id:c.dataset.ltick, done:c.checked}); viewList(); });
   $app.querySelectorAll("[data-lopen]").forEach(b => b.onclick = () => { store.set("listOpen", open === b.dataset.lopen ? null : b.dataset.lopen); viewList(); });

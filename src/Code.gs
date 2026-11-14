@@ -1,5 +1,8 @@
 /**
- * Teppan Cookbook endpoint, version 2 (CS-066, 2026-11-11).
+ * Teppan Cookbook endpoint, version 3 (CS-066, 2026-11-14). Version 2: 2026-11-11.
+ * Version 3 adds the "move" action (change an item's section and/or store) and the
+ * Learned tab (item, section, store), which every move updates and the app reads
+ * first when it places a newly added item.
  * A standalone Google Apps Script web app (project "Teppan Cookbook endpoint") that opens
  * the "Grocery list" Sheet in Spine/Cooking by its ID.
  * It runs as the owner, so the Teppan Cookbook app on any phone can read the
@@ -28,6 +31,7 @@ var GROCERY_ID = "1KxlIa3BW6oNmaBci59vc5kcs3fVxswmQpJEHcLd1OZo"; // Grocery list
 // Grocery list tabs, by position (new columns go at the end).
 var LIST_HEAD = ["ID","Item","Qty","Section","Store","Note","Added by","Added","Done","Done by","Done at","Cleared"];
 var USUAL_HEAD = ["ID","Item","Qty","Section","Store"];
+var LEARNED_HEAD = ["Item","Section","Store","Updated"];   // optional tab; missing = nothing learned yet
 // Cooking data tabs the app reads, with their widths. The app checks the headers.
 var COOK_TABS = {Recipes:13, Ingredients:11, Steps:8, Pantry:12, Glossary:4, Cooks:9};
 var COOKS_HEAD = ["Date","Recipe","Cook #",null,null,"Her reaction",null,"Next time try","Recipe ID"];
@@ -53,7 +57,8 @@ function handle(p) {
     if (a === "clear") return out(withLock(function(){ return clearDone(); }));
     if (a === "usual") return out(withLock(function(){ return usual(p.item, p.qty, p.section, p.store, !!p.star); }));
     if (a === "log") return out(withLock(function(){ return logCook(p.row); }));
-    if (a === "ping") return out({ok:true, pong:true, version:2, at:now()});
+    if (a === "move") return out(withLock(function(){ return move(p.id, p.section, p.store); }));
+    if (a === "ping") return out({ok:true, pong:true, version:3, at:now()});
     return out({ok:false, error:"Unknown action " + a});
   } catch (err) {
     return out({ok:false, error:String((err && err.message) || err)});
@@ -97,7 +102,7 @@ function sections() {
 function state(includeCooking) {
   var list = readTab(sheet("List"), LIST_HEAD).map(function(r){ return rowObj(LIST_HEAD, r); }).filter(function(x){ return x.ID && !x.Cleared; });
   var usual = readTab(sheet("Usual"), USUAL_HEAD).map(function(r){ return rowObj(USUAL_HEAD, r); }).filter(function(x){ return x.ID; });
-  var o = {ok:true, version:2, at:now(), list:list, usual:usual, sections:sections()};
+  var o = {ok:true, version:3, at:now(), list:list, usual:usual, sections:sections(), learned:learned()};
   if (includeCooking) {
     var ck = SpreadsheetApp.openById(COOKING_ID), raw = {};
     Object.keys(COOK_TABS).forEach(function(n){
@@ -196,6 +201,38 @@ function usual(item, qty, section, store, star) {
   }
   var after = readTab(s, USUAL_HEAD).map(function(r){ return rowObj(USUAL_HEAD, r); }).filter(function(x){ return x.ID; });
   return {ok:true, usual:after, at:now()};
+}
+
+/* ---------- move and learn ---------- */
+function learnedSheet() { return SpreadsheetApp.openById(GROCERY_ID).getSheetByName("Learned"); }
+function learned() {
+  var s = learnedSheet();
+  if (!s) return [];
+  return readTab(s, LEARNED_HEAD).map(function(r){ return rowObj(LEARNED_HEAD, r); }).filter(function(x){ return x.Item; });
+}
+// Upsert one Learned row by item name (case-insensitive). Blank section or store keeps what was there.
+function learn(item, section, store) {
+  var s = learnedSheet(), name = String(item || "").trim();
+  if (!s || !name) return;
+  var rows = readTab(s, LEARNED_HEAD), hit = 0;
+  for (var i = 0; i < rows.length; i++) if (String(rows[i][0]).trim().toLowerCase() === name.toLowerCase()) { hit = i + 2; break; }
+  var old = hit ? rows[hit - 2] : ["", "", "", ""];
+  var vals = [[safe(name), section || old[1], store || old[2], now()]];
+  writeText(s.getRange(hit || s.getLastRow() + 1, 1, 1, 4), vals);
+}
+// Change an item's section and/or store (row found by ID), read it back, and remember it in Learned.
+function move(id, section, store) {
+  var s = sheet("List"), r = findRow(s, id);
+  if (!r) return {ok:false, error:"No row " + id};
+  section = section ? sectionFor(section, sections()) : "";
+  store = store ? safe(String(store).trim()) : "";
+  if (!section && !store) return {ok:false, error:"Nothing to move"};
+  if (section) writeText(s.getRange(r, 4), [[section]]);
+  if (store) writeText(s.getRange(r, 5), [[store]]);
+  var back = rowObj(LIST_HEAD, s.getRange(r, 1, 1, LIST_HEAD.length).getDisplayValues()[0]);
+  if ((section && back.Section !== section) || (store && back.Store !== store.replace(/^'/, ""))) throw new Error("Move written but did not read back the same");
+  learn(back.Item, section, store);
+  return {ok:true, row:back, at:now()};
 }
 
 /* ---------- cook log ---------- */
