@@ -190,7 +190,7 @@ with sync_playwright() as p:
         a.click("[data-send-grocery]"); settle(a)
     except Exception: pass
     check("Shop sends a recipe's items to the shared list", lambda: any(r["Item"] == "Pork belly, thin-sliced" and r["Section"] == "Meat & seafood" for r in M.list))
-    check("Pantry 'Home staples'/'Refrigerated' sections map to store sections", lambda: next(r for r in M.list if r["Item"] == "Eggs")["Section"] == "Deli & fridge")
+    check("Pantry sections still apply when the word list has no match", lambda: next(r for r in M.list if r["Item"] == "Pork belly, thin-sliced")["Section"] == "Meat & seafood")
     n_before = len(M.list)
     try: a.click("[data-send-grocery]", timeout=T); settle(a)
     except Exception: pass
@@ -198,6 +198,7 @@ with sync_playwright() as p:
     # --- stores: Andronico's by default, Nijiya from the recipe, filter by store (owner, 2026-11-13) ---
     check("a typed item goes to Andronico's", lambda: next(r for r in M.list if r["Item"] == "Milk")["Store"] == "Andronico's")
     check("Shop: a Nijiya pantry item is sent as Nijiya", lambda: next(r for r in M.list if r["Item"] == "Pork belly, thin-sliced")["Store"] == "Nijiya")
+    check("Shop: Eggs land in Dairy & eggs, not the Pantry's 'Refrigerated'", lambda: next(r for r in M.list if r["Item"] == "Eggs")["Section"] == "Dairy & eggs")
     check("Shop: an 'Any grocery' pantry item is sent as Andronico's", lambda: next(r for r in M.list if r["Item"] == "Eggs")["Store"] == "Andronico's")
     try: go_list(a); a.click("[data-lstore='Nijiya']", timeout=T); settle(a)
     except Exception: pass

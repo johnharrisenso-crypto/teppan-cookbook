@@ -128,7 +128,7 @@ const GUESS = {
   "Produce": "apple banana orange lemon lime grape berry strawberry blueberry raspberry blackberry cherry peach pear plum mango pineapple melon watermelon cantaloupe kiwi avocado tomato potato sweet-potato yam onion shallot garlic ginger carrot celery cucumber zucchini squash pumpkin pepper bell-pepper jalapeno chili lettuce romaine spinach kale arugula chard cabbage broccoli cauliflower brussels brussel sprout asparagus bean-sprout green-bean pea corn mushroom shiitake eggplant radish daikon beet turnip leek scallion green-onion herb cilantro parsley basil mint dill rosemary thyme sage shiso salad greens green fruit vegetable veggie nagaimo",
   "Meat & seafood": "chicken beef pork lamb turkey duck steak ground-beef ground-turkey bacon sausage ham thigh breast wing drumstick rib ribeye brisket tenderloin loin belly chop fish salmon tuna cod halibut tilapia shrimp prawn scallop crab lobster clam mussel oyster squid octopus seafood meat",
   "Dairy & eggs": "milk oat-milk almond-milk soy-milk cream half-and-half butter cheese cheddar mozzarella parmesan feta brie yogurt yoghurt egg sour-cream cottage-cheese cream-cheese kefir ghee",
-  "Deli & fridge": "tofu tempura-tofu hummus salsa guacamole deli turkey-slices salami prosciutto pastrami cold-cut kimchi pickle beni-shoga tortilla fresh-pasta dumpling gyoza miso dip",
+  "Deli & fridge": "lunch-meat deli-meat cold-cuts sliced-turkey sliced-ham tofu tempura-tofu hummus salsa guacamole deli turkey-slices salami prosciutto pastrami cold-cut kimchi pickle beni-shoga tortilla fresh-pasta dumpling gyoza miso dip",
   "Dry goods": "rice pasta spaghetti noodle ramen udon soba flour sugar brown-sugar oat oatmeal cereal granola bean lentil chickpea quinoa couscous bread-crumb panko cracker chip pretzel popcorn nut almond peanut cashew walnut pecan seed raisin dried-fruit can canned soup broth stock peanut-butter jam jelly honey maple-syrup coffee tea cocoa baking-powder baking-soda yeast cornstarch chocolate cookie snack bar dashi tenkasu bonito nori seaweed",
   "Sauces & seasonings": "salt pepper-ground black-pepper spice cumin paprika cinnamon oregano chili-powder curry turmeric seasoning sauce soy-sauce ketchup mustard mayo mayonnaise kewpie vinegar oil olive-oil vegetable-oil sesame-oil hot-sauce sriracha bbq-sauce worcestershire dressing marinade sesame shichimi furikake mirin sake-cooking fish-sauce oyster-sauce",
   "Frozen": "ice-cream gelato frozen ice popsicle pizza-frozen",
@@ -152,9 +152,10 @@ function guessSection(name){
   const n = norm(name); if(!n) return "";
   const hit = (L ? [...L.list, ...L.usual] : []).find(x => norm(x.Item) === n && x.Section);
   if(hit) return hit.Section;
+  const w = guessByWords(name);                 // the word list is finer than the Pantry's six sections (eggs: Dairy & eggs, not Refrigerated)
+  if(w) return w;
   const p = D && D.pantry.find(x => norm(x.item) === n);
-  if(p) return sectionFor(p.section);
-  return guessByWords(name);
+  return p ? sectionFor(p.section) : "";
 }
 
 /* Stores (CS-066, 0.7.3, owner 2026-11-13): everything is bought at Andronico's unless a recipe's Pantry item says
